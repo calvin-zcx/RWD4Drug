@@ -22,3 +22,7 @@ patient_id
 date (administration/diagnosis date)
 diagnosis_code  (e.g. ICD 9, 10, etc.)
 diagnosis_code_type (e.g. Indicators for ICD 9, 10, etc.)
+
+put above tables into folders:
+florida
+marketscan
