@@ -17,7 +17,8 @@ from datetime import datetime
 from tqdm import tqdm
 from scipy import stats
 from ipreprocess.utils import load_icd_to_ccw
-
+import functools
+print = functools.partial(print, flush=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')

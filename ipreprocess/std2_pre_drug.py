@@ -9,7 +9,8 @@ import pickle
 import argparse
 import csv
 from utils import *
-
+import functools
+print = functools.partial(print, flush=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')

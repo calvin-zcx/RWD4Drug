@@ -11,7 +11,8 @@ import argparse
 import csv
 import utils
 import numpy as np
-
+import functools
+print = functools.partial(print, flush=True)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')

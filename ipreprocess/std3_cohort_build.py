@@ -14,6 +14,8 @@ import utils
 import json
 import pandas as pd
 from tqdm import tqdm
+import functools
+print = functools.partial(print, flush=True)
 
 
 def parse_args():
