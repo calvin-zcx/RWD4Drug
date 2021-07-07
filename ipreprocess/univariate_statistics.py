@@ -20,6 +20,7 @@ from ipreprocess.utils import load_icd_to_ccw
 import functools
 print = functools.partial(print, flush=True)
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')
     parser.add_argument('--dx_file', default=r'../data/florida/diagnosis.csv',
