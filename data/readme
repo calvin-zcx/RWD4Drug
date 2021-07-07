@@ -1,0 +1,24 @@
+Target patients: All MCI patients (code.startswith(('331.83', '294.9', 'G31.84', 'F09', '33183', '2949', 'G3184'))
+Data table: 1.demographics, 2.medication and 3.diagnosis with following necessary information (better with following order). Better to see the definition of table schemes with a few examples.
+
+Demographics table
+patient_id
+sex
+birth_date (only year in marketscan)
+race (not in Marketscan)
+zip code (if any)
+
+Medication table
+patient_id
+date (order/dispense date)
+drug_code  (e.g. NDC, rxnorm, GPI, etc)
+suppy_days (e.g. 30, 90 etc days if any)
+start_date (if any)
+end_date (if any)
+drug_name (if any)
+
+Diagnosis table
+patient_id
+date (administration/diagnosis date)
+diagnosis_code  (e.g. ICD 9, 10, etc.)
+diagnosis_code_type (e.g. Indicators for ICD 9, 10, etc.)
