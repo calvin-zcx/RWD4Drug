@@ -14,6 +14,7 @@ import numpy as np
 import functools
 print = functools.partial(print, flush=True)
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')
     parser.add_argument('--demo_file', default=r'../data/florida/demographic.csv',
