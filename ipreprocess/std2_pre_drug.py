@@ -136,15 +136,15 @@ def pre_drug_table(infile):
     print('Scan n_records: ', n_records)
     print('# of Drugs: {}\t'.format(len(mci_drug_taken_by_patient)))
 
-    try:
-        print('dumping...', flush=True)
-        il = re.split(r'[\/.]', infile)  #'../data/florida/prescribing.csv' -> ['', '', '', 'data', 'florida', 'prescribing', 'csv']
-        ofile = 'output/_mci_drug_taken_by_patient_from_{}_{}.pkl'.format(il[-3], il[-2])
-        check_and_mkdir(ofile)
-        pickle.dump(mci_drug_taken_by_patient, open(ofile, 'wb'))
-        print('dump {} done!'.format(ofile))
-    except Exception as e:
-        print(e)
+    # try:
+    #     print('dumping...', flush=True)
+    #     il = re.split(r'[\/.]', infile)  #'../data/florida/prescribing.csv' -> ['', '', '', 'data', 'florida', 'prescribing', 'csv']
+    #     ofile = 'output/_mci_drug_taken_by_patient_from_{}_{}.pkl'.format(il[-3], il[-2])
+    #     check_and_mkdir(ofile)
+    #     pickle.dump(mci_drug_taken_by_patient, open(ofile, 'wb'))
+    #     print('dump {} done!'.format(ofile))
+    # except Exception as e:
+    #     print(e)
 
     if b_build_vocabulary:
         try:
