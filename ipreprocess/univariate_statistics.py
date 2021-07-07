@@ -2,6 +2,8 @@ import argparse
 import os
 import time
 import sys
+# for linux env.
+sys.path.insert(0,'..')
 import pickle
 import utils
 import pickle

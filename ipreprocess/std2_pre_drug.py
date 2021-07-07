@@ -1,3 +1,6 @@
+import sys
+# for linux env.
+sys.path.insert(0,'..')
 import pandas as pd
 import time
 from collections import defaultdict
@@ -5,18 +8,6 @@ import re
 import pickle
 import argparse
 import csv
-import sys
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pickle as pkl
-import math
-import itertools
-import os
-import scipy
-import numpy as np
-from datetime import datetime
-import copy
-import re
 from utils import *
 
 

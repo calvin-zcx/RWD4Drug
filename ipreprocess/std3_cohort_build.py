@@ -1,7 +1,9 @@
+import sys
+# for linux env.
+sys.path.insert(0,'..')
 import argparse
 import os
 import time
-import sys
 from pre_cohort_ import exclude
 from std_pre_cohort_rx import pre_user_cohort_rx_v2
 from std_pre_cohort_dx import get_user_cohort_dx
