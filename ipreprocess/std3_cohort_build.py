@@ -35,17 +35,17 @@ def parse_args():
                         help='min <= (index_date - initiation_date).days <= max')
     parser.add_argument('--adrd_minus_index_min', default=0, type=int,
                         help='min bound <= (first_adrd_date - index_date).days')
+    parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     # others: folder and encodes
-    parser.add_argument('--demo_file', default=r'../data/florida/demographic.csv',
-                        help='input demographics file with std format')
     parser.add_argument('--dx_file', default=r'../data/florida/diagnosis.csv',
                         help='input diagnosis file with std format')
     parser.add_argument('--save_cohort_all', default='output/save_cohort_all/')
     parser.add_argument('--dx_coding', choices=['ccs', 'ccw'], default='ccw')
 
     # Deprecated
+    # parser.add_argument('--demo_file', default=r'../data/florida/demographic.csv',
+    #                     help='input demographics file with std format')
     # parser.add_argument('--input_data', default='../data/florida')
-    parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     # parser.add_argument('--pickles', default='pickles')
     # parser.add_argument('--outcome_icd9', default='outcome_icd9.txt', help='outcome definition with ICD-9 codes')
     # parser.add_argument('--outcome_icd10', default='outcome_icd10.txt', help='outcome definition with ICD-10 codes')
