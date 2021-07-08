@@ -133,7 +133,7 @@ if __name__ == '__main__':
     # Output: save_prescription: drug --> patients --> [date1, date2, ...] sorted
     #         save_patient: patient --> drugs --> [date1, date2, ...] sorted
     # Notes: 20210608: not using followup here, define time_interval as time between first and last prescriptions
-    # Notes: 20210706: save_patient, for baseline building, is all patient-drug info, rather than previous cohort-included drugs only.
+    #        20210706: save_patient for baseline building, use all patient-drug info, instead of previous cohort-included drugs only.
     save_prescription, save_patient = exclude(mci_prescription_taken_by_patient, patient_dates, eligibility_criteria)
     # args.time_interval, args.followup, args.baseline, args.min_prescription)
 
