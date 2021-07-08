@@ -18,7 +18,8 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
     cohorts_size_pos = []
 
     for drug, taken_by_patient in tqdm(user_cohort_rx.items()):
-        file_x = '{}/{}.pkl'.format(out_file_root, drug)
+        # file_x = '{}/{}.pkl'.format(out_file_root, drug)
+        file_x = os.path.join(out_file_root, '{}.pkl'.format(drug))
         triples = []
         # initialize patient characteristics for this drug trial
         drug_patient = pd.DataFrame(0,
@@ -144,7 +145,7 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
         )
         # cohorts_size_pos.append(('{}.pkl'.format(drug), len(triples), sum([x[-1][0] for x in triples])))
 
-    pickle.dump(cohorts_size, open('{}/cohorts_size.pkl'.format(out_file_root), 'wb'))
+    pickle.dump(cohorts_size, open(os.path.join(out_file_root, 'cohorts_size.pkl'), 'wb'))  # '{}/cohorts_size.pkl'.format(out_file_root)
     df = pd.DataFrame(cohorts_size_pos, columns=['cohort_name', 'n_patients', 'n_pos', 'n_censor', 'n_neg',
                                                  't2e_pos_avg', 't2e_censor_avg', 't2e_neg_avg',
                                                  "n_no_drug", "n_no_diagnosis"])
@@ -152,7 +153,7 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
     # add more info
     df['pos_ratio'] = df['n_pos'] / df['n_patients']
     df['drug_name'] = df['cohort_name'].apply(lambda x: drug_name[x.split('.')[0]])
-    df.to_csv('{}/cohort_all_name_size_positive.csv'.format(out_file_root))
+    df.to_csv(os.path.join(out_file_root, 'cohort_all_name_size_positive.csv'))  # '{}/cohort_all_name_size_positive.csv'.format(out_file_root)
 
     print('...pre_user_cohort_triplet done!')
 
