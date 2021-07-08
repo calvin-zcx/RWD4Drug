@@ -7,59 +7,57 @@ import csv
 import utils
 
 
-def get_user_dx_and_outcome(indir, patient_set, icd9_to_ccs, icd10_to_ccs, icd_to_ccw, coding, criterion):
-    print('get_user_dx_and_outcome...')
+def get_user_dx(indir, patient_list, icd9_to_ccs, icd10_to_ccs, icd_to_ccw, coding):
+
     user_dx = defaultdict(dict)
-    cohort_outcome = {key: defaultdict(list) for key in criterion.keys()}
 
     DXVER_dict = {9: icd9_to_ccs, 10: icd10_to_ccs, 'ccw': icd_to_ccw}
+    patient_set = set(patient_list)
+
     n_records = 0
     n_not_in_patient_list_or_nan = 0
     n_not_in_ccs = 0
     n_no_date = 0
-    with open(indir, 'r') as f:
-        col_name = next(csv.reader(f))  # read from std dx format
-        print('read from ', indir, col_name)
+    with open(os.path.join(indir, 'DIAGNOSIS.csv'), 'r') as f:  # 'MCI_DIANGOSIS.csv'
+        col_name = next(csv.reader(f))  # read from first non-name row, above code from 2nd, wrong
         for row in tqdm(csv.reader(f)):  # , total=34554738):
             n_records += 1
-            patid, date, dx = row[0], row[1], row[2]
+            patid, ad_date, dx, dx_type = row[1], row[4], row[6], row[7]
+            # # datetime(*list(map(int, date.split('-'))))
+            # date = utils.str_to_datetime(date)
+            dx_date = row[8]
 
-            if (date == '') or (date == 'NULL'):
+            if patid.startswith('--'):
+                print('Skip {}th row: {}'.format(n_records, row))
+                continue
+
+            # First use ADMIT_DATE,  then DX_DATE, then discard record
+            if (ad_date != '') and (ad_date != 'NULL'):
+                date = utils.str_to_datetime(ad_date)
+            elif (dx_date != '') and (dx_date != 'NULL'):
+                date = utils.str_to_datetime(dx_date)
+            else:
                 n_no_date += 1
                 continue
-            else:
-                date = utils.str_to_datetime(date)
 
-            if patid not in patient_set:
-                # or pd.isna(date) or pd.isna(dx):
+            if (patid not in patient_set) or pd.isna(date) or pd.isna(dx):
                 n_not_in_patient_list_or_nan += 1
                 continue
 
-            # 2021-07-08 newly add outcome part, combine, scan diagnosis file only once
-            for key, fc in criterion.items():
-                if fc(dx):
-                    cohort_outcome[key][patid].append(date)
-
             try:
-                # florida:
-                    # 10                22540060
-                    # 9                11195478
-                    # 10                483263
-                    # 09                326864
-                    # OT                8131
-                    # SM                942
-                # marketscan: no diagnosis type
-                dx_type = int(row[3])
-            except:
-                dx_type = -1
+                # 10                22540060
+                # 9                11195478
+                # 10                483263
+                # 09                326864
+                # OT                8131
+                # SM                942
+                dx_type = int(dx_type)
+            except ValueError:
+                continue
 
-            if (dx_type == 9) or (dx_type == 10):
-                ccs = get_ccs_code_for_1_icd(dx, DXVER_dict[dx_type])
-            else:  # no diagnosis type specified, try both ICD-9 and ICD-10, and selected non-null string
-                ccs1 = get_ccs_code_for_1_icd(dx, DXVER_dict[9])
-                ccs2 = get_ccs_code_for_1_icd(dx, DXVER_dict[10])
-                ccs = max(ccs1, ccs2)  # '' v.s. string code
+            assert dx_type == 9 or dx_type == 10
 
+            ccs = get_ccs_code_for_1_icd(dx, DXVER_dict[dx_type])
             ccw = get_ccs_code_for_1_icd(dx, DXVER_dict['ccw'])
 
             if coding == 'ccs':
@@ -78,7 +76,7 @@ def get_user_dx_and_outcome(indir, patient_set, icd9_to_ccs, icd10_to_ccs, icd_t
                     else:
                         user_dx[patid][date].append((dx, ccs, ccw))  # (dxs)
 
-    return user_dx, cohort_outcome
+    return user_dx
 
 
 def get_ccs_code_for_1_icd(icd_code: str, icd_to_css):
@@ -104,18 +102,12 @@ def get_ccs_code_for_1_icd(icd_code: str, icd_to_css):
 
 
 def pre_user_cohort_dx(user_dx, prescription_taken_by_patient, min_patients, coding):
-    print('in pre_user_cohort_dx...')
     user_cohort_dx = AutoVivification()
-    no_record_patients = set([])
     for drug, taken_by_patient in tqdm(prescription_taken_by_patient.items()):
         if len(taken_by_patient.keys()) >= min_patients:
             for patient, taken_times in taken_by_patient.items():
                 index_date = taken_times[0]
                 date_codes = user_dx.get(patient)
-                if date_codes is None:
-                    print('In drug', drug, 'patient ', patient, 'has no diagnosis in user_dx')
-                    no_record_patients.add(patient)
-                    continue
                 for date, codes in date_codes.items():
                     # date = utils.str_to_datetime(date)  # datetime.strptime(date, '%m/%d/%Y')
                     icd_codes, ccs_codes, ccw_codes = zip(*codes)  #
@@ -127,10 +119,7 @@ def pre_user_cohort_dx(user_dx, prescription_taken_by_patient, min_patients, cod
                     else:
                         raise ValueError
 
-                    # the major ccs/ccw code is not '', and keep all (dx, ccs, ccw) codes???
-                    # code_list = codes
-
-                    if date <= index_date:  # use <=, ranther than < in 2021-07-06
+                    if date < index_date:
                         if drug not in user_cohort_dx:
                             user_cohort_dx[drug][patient][date] = set(code_list)
                         else:
@@ -142,8 +131,6 @@ def pre_user_cohort_dx(user_dx, prescription_taken_by_patient, min_patients, cod
                                 else:
                                     user_cohort_dx[drug][patient][date].union(code_list)
 
-    print('in pre_user_cohort_dx, len(no_record_patients) {} patients have no diagnosis records'.format(len(no_record_patients)))
-    print(no_record_patients)
     return user_cohort_dx
 
 
@@ -158,10 +145,9 @@ class AutoVivification(dict):
 
 
 def get_user_cohort_dx(indir, prescription_taken_by_patient, icd9_to_css, icd10_to_css, icd_to_ccw, coding,
-                       min_patient, patient_set, criterion):
+                       min_patient, patient_list):
     print('get_user_cohort_dx...')
     print('Diagnosis coding type: ', coding)
-    user_dx, cohort_outcome = get_user_dx_and_outcome(indir, patient_set, icd9_to_css, icd10_to_css, icd_to_ccw, coding, criterion)
-    print('in get_user_cohort_dx, len(user_dx): ', len(user_dx))
-    return pre_user_cohort_dx(user_dx, prescription_taken_by_patient, min_patient, coding), user_dx, cohort_outcome
+    user_dx = get_user_dx(indir, patient_list, icd9_to_css, icd10_to_css, icd_to_ccw, coding)
+    return pre_user_cohort_dx(user_dx, prescription_taken_by_patient, min_patient, coding), user_dx
 

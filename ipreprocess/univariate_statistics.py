@@ -51,7 +51,7 @@ def t_test(a, b):
         r = stats.ttest_ind(a, b, equal_var=False)
         return '{:.4f} ({:.4f})'.format(r[1], r[0])
     except Exception as e:
-        print('t_test: ', str(e))
+        # print('t_test: ', str(e))
         return str(e)
 
 
@@ -64,7 +64,7 @@ def chi2(ad, other, cat=(0, 1)):
         r = stats.chi2_contingency(contingency_table)
         return '{:.4f} ({:.4f})'.format(r[1], r[0])
     except Exception as e:
-        print('chi2: ', str(e))
+        # print('chi2: ', str(e))
         return str(e)
 
 

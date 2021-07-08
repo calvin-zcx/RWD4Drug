@@ -1,13 +1,13 @@
 import sys
+
 # for linux env.
-sys.path.insert(0,'..')
+sys.path.insert(0, '..')
 import argparse
 import os
 import time
-from pre_cohort_ import exclude
+from std_eligibility_screen import exclude
 from std_pre_cohort_rx import pre_user_cohort_rx_v2
 from std_pre_cohort_dx import get_user_cohort_dx
-from std_pre_outcome import pre_user_cohort_outcome
 from std_user_cohort import pre_user_cohort_triplet
 import pickle
 import utils
@@ -15,20 +15,25 @@ import json
 import pandas as pd
 from tqdm import tqdm
 import functools
+
 print = functools.partial(print, flush=True)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')
     # use default value
-    parser.add_argument('--min_patients', default=20, type=int, help='minimum number of patients for each cohort. [Default 20]')  #500
+    parser.add_argument('--min_patients', default=20, type=int,
+                        help='minimum number of patients for each cohort. [Default 20]')  # 500
     parser.add_argument('--min_age', default=50, type=int, help='minimum age at initiation date [Default 50 years old]')
     # Selection criterion: Value to play with
-    parser.add_argument('--min_prescription', default=4, type=int, help='minimum times of prescriptions of each patient in each drug trial.')
+    parser.add_argument('--min_prescription', default=4, type=int,
+                        help='minimum times of prescriptions of each patient in each drug trial.')
     parser.add_argument('--exposure_interval', default=730, type=int,
                         help='Drug exposure period, minimum time interval for the first and last prescriptions')
-    parser.add_argument('--followup', default=730, type=int, help='number of days of followup period, to define outcome')
-    parser.add_argument('--baseline', default=365, type=int, help='number of days of baseline period, to collect covariates')
+    parser.add_argument('--followup', default=730, type=int,
+                        help='number of days of followup period, to define outcome')
+    parser.add_argument('--baseline', default=365, type=int,
+                        help='number of days of baseline period, to collect covariates')
     parser.add_argument('--index_minus_init_min', default=0, type=int,
                         help='min <= (index_date - initiation_date).days <= max')
     parser.add_argument('--index_minus_init_max', default=99999999999999, type=int,
@@ -61,6 +66,7 @@ def get_patient_list(min_patient, prescription_taken_by_patient):
         if len(patients) >= min_patient:
             for patient in patients:
                 patients_list.add(patient)
+    print('in get_patient_list, len(patients_list): ', len(patients_list))
     return patients_list
 
 
@@ -81,7 +87,7 @@ if __name__ == '__main__':
     dirname = os.path.dirname(args.save_cohort_all)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-    with open(args.save_cohort_all+r'/commandline_args.txt', 'w') as f:
+    with open(args.save_cohort_all + r'/commandline_args.txt', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
         print(json.dumps(args.__dict__, sort_keys=False, indent=2))
 
@@ -113,12 +119,13 @@ if __name__ == '__main__':
         is_antidiabetic = lambda x: (x[:2] == '27')
         is_antihypertensives = lambda x: (x[:2] == '36')
         drug_name_cnt = pickle.load(open(os.path.join('output', '_gpi_ingredients_nameset_cnt.pkl'), 'rb'))
-        drug_name = {k:v[0] for k, v in drug_name_cnt.items()}
+        drug_name = {k: v[0] for k, v in drug_name_cnt.items()}
     else:
         print('using default rxnorm_cui drug coding')
         is_antidiabetic = lambda x: x in atc2rxnorm['A10']
         is_antihypertensives = lambda x: x in atc2rxnorm['C02']
         from std2_pre_drug import load_latest_rxnorm_info
+
         drug_name, _ = load_latest_rxnorm_info()
 
     print('**********Preprocessing patient data**********')
@@ -136,15 +143,20 @@ if __name__ == '__main__':
     # Should I only calculate the (rx, dx) covariates in the baseline period within only baseline-time windows?
     # drug --> patient --> dates --> prescription list in the Baseline
     save_cohort_rx = pre_user_cohort_rx_v2(save_prescription, save_patient, args.min_patients)
+
     # drug --> patient --> dates --> diagnosis list in the Baseline
     # _user_dx: patient-->dates-->diagnosis list for patients in patient_list, for debug, not used
-    save_cohort_dx, _user_dx = get_user_cohort_dx(args.dx_file, save_prescription, icd9_to_ccs, icd10_to_ccs,
-                                                  icd_to_ccw, args.dx_coding, args.min_patients, patient_list)
-    # patient --> demo feature tuple
-    save_cohort_demo = patient_demo   # read_demo(args.demo_file, patient_list)
-    # event type --> patient --> event date list
+    # save_cohort_outcome: event type --> patient --> event date list
     # 2021-06-14 Only using AD, not using dementia: #{'AD': utils.is_AD, 'dementia': utils.is_dementia}
-    save_cohort_outcome = pre_user_cohort_outcome(args.dx_file, patient_list, {'AD': utils.is_AD})
+    # 2021-07-08 integrate pre_user_cohort_outcome into get_user_cohort_dx, scan diagnosis file once
+    # # save_cohort_outcome = pre_user_cohort_outcome(args.dx_file, patient_list, {'AD': utils.is_AD})
+    save_cohort_dx, _user_dx, save_cohort_outcome = get_user_cohort_dx(args.dx_file, save_prescription, icd9_to_ccs,
+                                                                       icd10_to_ccs,
+                                                                       icd_to_ccw, args.dx_coding, args.min_patients,
+                                                                       patient_list,
+                                                                       {'AD': utils.is_AD})
+    # patient --> demo feature tuple
+    save_cohort_demo = patient_demo  # read_demo(args.demo_file, patient_list)
 
     print('**********Generating patient cohort**********')
     # for each drug, dump (patients, [rx_codes, dx_codes, demo], outcome)
@@ -153,6 +165,6 @@ if __name__ == '__main__':
                             save_cohort_outcome, save_cohort_demo, args.save_cohort_all,
                             patient_dates, args.followup, drug_name,
                             ccwcomorbidityid_name,
-                            {'antidiabetic':is_antidiabetic, 'antihypertensives':is_antihypertensives})  # last 2 are new added
+                            {'antidiabetic': is_antidiabetic,
+                             'antihypertensives': is_antihypertensives})  # last 2 are new added
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
-
