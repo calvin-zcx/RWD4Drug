@@ -153,6 +153,7 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
     # add more info
     df['pos_ratio'] = df['n_pos'] / df['n_patients']
     df['drug_name'] = df['cohort_name'].apply(lambda x: drug_name[x.split('.')[0]])
+    df.sort_values(by=['n_patients'], inplace=True, ascending=False)
     df.to_csv(os.path.join(out_file_root, 'cohort_all_name_size_positive.csv'))  # '{}/cohort_all_name_size_positive.csv'.format(out_file_root)
 
     print('...pre_user_cohort_triplet done!')
