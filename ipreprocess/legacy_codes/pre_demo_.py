@@ -195,7 +195,7 @@ def plot_MCI_to_ADRD():
 
 # future add patient in list function
 if __name__ == '__main__':
-    DATA_DIR = r'C:\Users\zangc\Documents\Boston\data_large\MCI_data_20210421'
+    DATA_DIR = 'DELETE-ADD-LATER'
     start_time = time.time()
     # id_demo = read_demo(DATA_DIR)
     patient_dates = build_patient_dates(DATA_DIR=DATA_DIR)

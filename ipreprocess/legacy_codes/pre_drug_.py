@@ -21,9 +21,9 @@ from utils import str_to_datetime
 
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')
-    parser.add_argument('--input_dispense', default=r'C:\Users\zangc\Documents\Boston\data_large\MCI_data_20210421\DISPENSING.csv',
+    parser.add_argument('--input_dispense', default=r'DELETE-ADD-LATER\DISPENSING.csv',
                         help='input data MCI_DISPENSING.csv directory')
-    parser.add_argument('--input_prescribe', default=r'C:\Users\zangc\Documents\Boston\data_large\MCI_data_20210421\PRESCRIBING.csv',
+    parser.add_argument('--input_prescribe', default=r'DELETE-ADD-LATER\PRESCRIBING.csv',
                         help='input data MCI_PRESCRIBING.csv directory')
     args = parser.parse_args()
     return args
