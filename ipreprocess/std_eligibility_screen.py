@@ -47,7 +47,7 @@ def exclude(prescription_taken_by_patient, patient_dates, eligibility_criteria):
                     criteria_2_is_valid(dates, dates_days, eligibility_criteria) and \
                     criteria_3_is_valid(index_date, start_date, eligibility_criteria) and \
                     criteria_4_is_valid(index_date, first_adrd_date, eligibility_criteria):
-                prescription_taken_by_patient_exclude[drug][patient] = dates # drug cohorts, should use exclude
+                prescription_taken_by_patient_exclude[drug][patient] = dates  # drug cohorts, should use exclude
                 # patient_take_prescription_exclude[patient][drug] = dates
                 # #patient_take_prescription_exclude maybe wrong. used for building baseline. should use all drug info, instead of only exclude information
 
