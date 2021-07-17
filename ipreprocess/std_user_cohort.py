@@ -83,7 +83,7 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
             # 2021-07-08 I will keep patients who have no CCW codes in their baseline. No ccw codes are also informative
             # AD or AD/RD ccw codes are not used, because they should not appear in baseline
 
-            # keep this format, consistency with model and dateset. may change later
+            # keep this format, consistency with PSModels and dateset. may change later
             # Change demo, may add race later
             # triple = (patient, [rx_codes, dx_codes, demo_feature_vector[0], demo_feature_vector[1]], outcome)  # only use 0-1 right now
             # demo_feature_vector: [age, sex, race, days_since_mci]

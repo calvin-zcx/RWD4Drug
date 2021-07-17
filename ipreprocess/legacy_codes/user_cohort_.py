@@ -52,7 +52,7 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
                 rx_codes = [rx_code for date, rx_code in sorted(taken_times.items(), key=lambda x:x[0])]  # sort by key (date)
             if dx:
                 dx_codes = [list(dx_code) for date, dx_code in sorted(dx.items(), key=lambda x:x[0])]
-            # keep this format, consistency with model and dateset. may change later
+            # keep this format, consistency with PSModels and dateset. may change later
             # Change demo, may add race later
             # triple = (patient, [rx_codes, dx_codes, demo_feature_vector[0], demo_feature_vector[1]], outcome)  # only use 0-1 right now
             # demo_feature_vector: [age, sex, race, days_since_mci]
