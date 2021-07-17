@@ -607,10 +607,10 @@ if __name__ == "__main__":
         #     'dropout': [0.5],
         # }
         paras_grid = {
-            'batch_size': [32, 64, 128],
             'hidden_size': [0, 32, 64, 128],
             'lr': [1e-2, 1e-3, 1e-4],
             'weight_decay': [1e-4, 1e-5, 1e-6],
+            'batch_size': [32, 64, 128],
             'dropout': [0.5],
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
@@ -626,7 +626,7 @@ if __name__ == "__main__":
 
         for hyper_paras in tqdm(hyper_paras_list):
             i += 1
-            batch_size, hidden_size, lr, weight_decay, dropout = hyper_paras
+            hidden_size, lr, weight_decay, batch_size, dropout = hyper_paras
             print('In hyper-paras space [{}/{}]...'.format(i, len(hyper_paras_list)))
             print(hyper_paras_names)
             print(hyper_paras)
