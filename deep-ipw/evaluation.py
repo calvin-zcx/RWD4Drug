@@ -387,8 +387,8 @@ def cal_weights(golds_treatment, logits_treatment, normalized, stabilized=True):
         treated_w, controlled_w = 1. / logits_treatment[ones_idx], 1. / (
                     1. - logits_treatment[zeros_idx])  # why *p_T here? my added test
 
-    treated_w = np.clip(treated_w, a_min=1e-06, a_max=25)
-    controlled_w = np.clip(controlled_w, a_min=1e-06, a_max=25)
+    treated_w = np.clip(treated_w, a_min=1e-06, a_max=50)
+    controlled_w = np.clip(controlled_w, a_min=1e-06, a_max=50)
 
     # treated_w = np.where(treated_w < 10, treated_w, 25)
     # controlled_w = np.where(controlled_w < 10, controlled_w, 10)

@@ -599,30 +599,32 @@ if __name__ == "__main__":
         print(args.run_model, ' PS model learning:')
 
         # PSModels configuration & training
-        # paras_grid = { # test
-        #     'batch_size': [32, 64, 128],
-        #     'hidden_size': [32],  # [0, 32, 64, 128],
-        #     'lr': [1e-3],  # [1e-2, 1e-3, 1e-4],
-        #     'weight_decay': [1e-6],  #[1e-4, 1e-5, 1e-6],
-        #     'dropout': [0.5],
-        # }
         paras_grid = {
-            'hidden_size': [0, 32, 64, 128],
-            'lr': [1e-2, 1e-3, 1e-4],
-            'weight_decay': [1e-4, 1e-5, 1e-6],
-            'batch_size': [32, 64, 128],
+            'hidden_size': [128],
+            'lr': [1e-3],
+            'weight_decay': [1e-5],
+            'batch_size': [32],
             'dropout': [0.5],
         }
+        # paras_grid = {
+        #     'hidden_size': [0, 32, 64, 128],
+        #     'lr': [1e-2, 1e-3, 1e-4],
+        #     'weight_decay': [1e-4, 1e-5, 1e-6],
+        #     'batch_size': [32, 64, 128],
+        #     'dropout': [0.5],
+        # }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
         hyper_paras_list = list(itertools.product(*hyper_paras_v))
         print('Model {} Searching Space N={}: '.format(args.run_model, len(hyper_paras_list)), paras_grid)
 
         i = -1
-        best_selection_val = float('-inf')
+        best_selection_val_auc = float('-inf')
         best_model_epoch = -1
         best_model_iter = -1
         best_model_selection_evaluation = None
         best_model_configure = None
+        best_selection_val_smd = float('inf')
+        validation_results_at_best = None
 
         for hyper_paras in tqdm(hyper_paras_list):
             i += 1
@@ -682,8 +684,8 @@ if __name__ == "__main__":
                 max_unbalanced, hidden_deviation, max_unbalanced_weighted, hidden_deviation_w = val_SMD_ALL[0], val_SMD_ALL[
                     1], val_SMD_ALL[3], val_SMD_ALL[4]
 
-                n_unbalanced_feat_w = len(np.where(hidden_deviation_w > SMD_THRESHOLD)[0])
-                n_unbalanced_feat = len(np.where(hidden_deviation > SMD_THRESHOLD)[0])
+                n_unbalanced_feat_w = val_SMD_ALL[5]   # len(np.where(hidden_deviation_w > SMD_THRESHOLD)[0])
+                n_unbalanced_feat = val_SMD_ALL[2]   # len(np.where(hidden_deviation > SMD_THRESHOLD)[0])
                 model_selection_evaluation.append(
                     [epoch, epoch_losses_ipw, loss_val, AUC_val, AUC_val_iptw, AUC_val_expected,
                      np.abs(AUC_val-AUC_val_expected),
@@ -702,7 +704,8 @@ if __name__ == "__main__":
                       )
                 print('ATE_val:{} --> ATE_val_w: {}'.format(val_ATE_ALL[2], val_ATE_ALL[5]))
 
-                if AUC_val > best_selection_val:
+                if (AUC_val > best_selection_val_auc) and (n_unbalanced_feat_w <= best_selection_val_smd):
+                # if (AUC_val > best_selection_val_auc):
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
                           ' Epoch: ', epoch, 'AUC_val:', AUC_val,
                           'max_unbalanced_weighted:', max_unbalanced_weighted,
@@ -711,13 +714,24 @@ if __name__ == "__main__":
                     print(hyper_paras)
 
                     save_model(model, args.save_model_filename, model_params=model_params)
-                    best_selection_val = AUC_val
+                    best_selection_val_auc = AUC_val
+                    best_selection_val_smd = n_unbalanced_feat_w
                     best_model_epoch = epoch
                     best_model_iter = i
                     best_model_configure = hyper_paras
+                    validation_results_at_best = (val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL)
 
             if best_model_iter == i:
                 best_model_selection_evaluation = model_selection_evaluation
+
+        print('Model selection finished! Save Global Best PSModel at Hyper-iter [{}/{}], Epoch: {}'.format(
+            i, len(hyper_paras_list), best_model_epoch)
+        )
+        print('AUC_val:', best_selection_val_auc,
+              'max_unbalanced_weighted:', validation_results_at_best[2][3],
+              'n_unbalanced_feat_w', best_selection_val_smd)
+        print(hyper_paras_names)
+        print(best_model_configure)
 
         model_selection_evaluation_pd = pd.DataFrame(best_model_selection_evaluation,
                                                      columns=['epoch', 'loss_train', 'loss_val', 'AUC_val',
