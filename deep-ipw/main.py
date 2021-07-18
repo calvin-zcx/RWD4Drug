@@ -599,20 +599,20 @@ if __name__ == "__main__":
         print(args.run_model, ' PS model learning:')
 
         # PSModels configuration & training
-        paras_grid = {
-            'hidden_size': [128],
-            'lr': [1e-3],
-            'weight_decay': [1e-5],
-            'batch_size': [32],
-            'dropout': [0.5],
-        }
         # paras_grid = {
-        #     'hidden_size': [0, 32, 64, 128],
-        #     'lr': [1e-2, 1e-3, 1e-4],
-        #     'weight_decay': [1e-4, 1e-5, 1e-6],
-        #     'batch_size': [32, 64, 128],
+        #     'hidden_size': [128],
+        #     'lr': [1e-3],
+        #     'weight_decay': [1e-5],
+        #     'batch_size': [32],
         #     'dropout': [0.5],
         # }
+        paras_grid = {
+            'hidden_size': [0, 32, 64, 128],
+            'lr': [1e-2, 1e-3, 1e-4],
+            'weight_decay': [1e-4, 1e-5, 1e-6],
+            'batch_size': [32, 64, 128],
+            'dropout': [0.5],
+        }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
         hyper_paras_list = list(itertools.product(*hyper_paras_v))
         print('Model {} Searching Space N={}: '.format(args.run_model, len(hyper_paras_list)), paras_grid)
