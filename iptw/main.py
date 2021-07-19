@@ -714,7 +714,7 @@ if __name__ == "__main__":
                       )
                 print('ATE_val:{} --> ATE_val_w: {}'.format(val_ATE_ALL[2], val_ATE_ALL[5]))
 
-                if (AUC_val > best_selection_val_auc) and (max_unbalanced_weighted <= best_selection_val_smd):
+                if (max_unbalanced_weighted <= best_selection_val_smd):  #(AUC_val > best_selection_val_auc) and
                 # if (AUC_val > best_selection_val_auc):
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
                           ' Epoch: ', epoch, 'AUC_val:', AUC_val,
