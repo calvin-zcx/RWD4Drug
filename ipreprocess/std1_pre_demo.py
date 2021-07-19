@@ -62,6 +62,7 @@ def read_demo(data_file, out_file=''):
     """
     start_time = time.time()
     n_read = 0
+    n_invalid = 0
     id_demo = {}
     with open(data_file, 'r') as f:
         col_name = next(csv.reader(f))  # read from first non-name row, above code from 2nd, wrong
@@ -70,7 +71,13 @@ def read_demo(data_file, out_file=''):
             n_read += 1
             patid = row[0]
             sex = 0 if (row[1] == 'F' or row[1] == '2') else 1  # Female 0, Male, and UN 1
-            bdate = utils.str_to_datetime(row[2])
+            try:
+                bdate = utils.str_to_datetime(row[2])
+            except:
+                print('invalid birth date in ', n_read, row)
+                n_invalid += 1
+                continue
+
             zipcode = row[3]
             try:
                 race = int(row[4])
@@ -80,6 +87,7 @@ def read_demo(data_file, out_file=''):
             # if (patient_set is None) or (patid in patient_set):
             id_demo[patid] = (bdate, sex, race, zipcode)
     print('read {} rows, len(id_demo) {}'.format(n_read, len(id_demo)))
+    print('n_invalid rows: ', n_invalid)
     print('read_demo done! Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
     if out_file:

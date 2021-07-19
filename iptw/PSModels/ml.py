@@ -1,3 +1,8 @@
+import sys
+
+# for linux env.
+sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn import svm, tree
@@ -10,6 +15,7 @@ from sklearn.metrics import log_loss
 from tqdm import tqdm
 import xgboost as xgb
 import lightgbm as lgb
+from iptw.evaluation import cal_deviation, SMD_THRESHOLD
 
 
 class PropensityEstimator:
@@ -37,7 +43,13 @@ class PropensityEstimator:
 
         self.best_hyper_paras = None
         self.best_model = None
+
         self.best_val = float('-inf')
+        self.best_balance = float('inf')
+
+        self.global_best_val = float('-inf')
+        self.global_best_balance = float('inf')
+
         self.results = []
 
     def fit(self, X_train, T_train, X_val, T_val, verbose=1):
@@ -61,17 +73,34 @@ class PropensityEstimator:
 
             T_val_predict = model.predict_proba(X_val)[:, 1]
             auc_val = roc_auc_score(T_val, T_val_predict)
+            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict,
+                                                                  normalized=True, verbose=False)
+            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
+            n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
 
             T_train_predict = model.predict_proba(X_train)[:, 1]
             auc_train = roc_auc_score(T_train, T_train_predict)
             loss_train = log_loss(T_train, T_train_predict)
 
-            self.results.append((para_d, loss_train, auc_train, auc_val))  # model,  not saving model for less disk
-            if auc_val > self.best_val:
+            self.results.append((para_d, loss_train, auc_train, auc_val,
+                                 max_smd, n_unbalanced_feature, max_smd_weighted,
+                                 n_unbalanced_feature_w))  # model,  not saving model for less disk
+
+            if (max_smd_weighted <= self.best_balance):  # and (auc_val > self.best_val):  #
                 self.best_model = model
                 self.best_hyper_paras = para_d
                 self.best_val = auc_val
+                self.best_balance = max_smd_weighted
 
+            if auc_val > self.global_best_val:
+                self.global_best_val = auc_val
+
+            if max_smd_weighted <= self.global_best_balance:
+                self.global_best_balance = max_smd_weighted
+
+        self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss', 'train_auc', 'validation_auc',
+                                                           "max_smd", "n_unbalanced_feature", "max_smd_weighted",
+                                                           "n_unbalanced_feature_w"])
         if verbose:
             self.report_stats()
 
@@ -82,9 +111,12 @@ class PropensityEstimator:
         print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
         print('Best model: ', self.best_model)
         print('Best configuration: ', self.best_hyper_paras)
-        print('Best value: ', self.best_val)
-        print('AUC stats:\n', pd.DataFrame(self.results,
-                                           columns=['paras', 'train_loss', 'train_auc', 'validation_auc']).describe())
+        print('Best fit value ', self.best_val, ' Global Best fit balue: ', self.global_best_val)
+        print('Best balance: ', self.best_balance, ' Global Best balance: ', self.global_best_balance)
+        pd.set_option('display.max_columns', None)
+        describe = self.results.decribe()
+        print('AUC stats:\n', describe)
+        return describe
 
     def predict_ps(self, X):
         pred_ps = self.best_model.predict_proba(X)[:, 1]
@@ -94,7 +126,6 @@ class PropensityEstimator:
     def predict_loss(self, X, T):
         T_pre = self.predict_ps(X)
         return log_loss(T, T_pre)
-
 
 # class OutcomeEstimator:
 #     def __init__(self, learner, x_input, outcome, sample_weights=None):

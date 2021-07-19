@@ -573,6 +573,13 @@ if __name__ == "__main__":
                 'random_state': [args.random_seed],
             }
         elif args.run_model == 'LIGHTGBM':
+            # paras_grid = {
+            #     'max_depth': [3, 4, 5],
+            #     'learning_rate': np.arange(0.01, 1, 0.1),
+            #     'num_leaves': np.arange(5, 50, 5),
+            #     'min_child_samples': np.arange(50, 300, 50),
+            #     'random_state': [args.random_seed],
+            # }
             paras_grid = {
                 'max_depth': [3, 4],
                 'learning_rate': np.arange(0.01, 1, 0.1),

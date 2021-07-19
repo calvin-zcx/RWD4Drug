@@ -416,14 +416,15 @@ def weighted_var(x, w):
     return var
 
 
-def cal_deviation(hidden_val, golds_treatment, logits_treatment, normalized):
+def cal_deviation(hidden_val, golds_treatment, logits_treatment, normalized, verbose=1):
     # covariates, and IPTW
     ones_idx, zeros_idx = np.where(golds_treatment == 1), np.where(golds_treatment == 0)
     treated_w, controlled_w = cal_weights(golds_treatment, logits_treatment, normalized=normalized)
-    print('In cal_deviation: n_treated:{}, n_treated_w:{} |'
-          'n_controlled:{}, n_controlled_w:{} |'
-          'n:{}, n_w:{}'.format(len(treated_w), treated_w.sum(), len(controlled_w), controlled_w.sum(),
-                                len(golds_treatment), treated_w.sum() + controlled_w.sum()))
+    if verbose:
+        print('In cal_deviation: n_treated:{}, n_treated_w:{} |'
+              'n_controlled:{}, n_controlled_w:{} |'
+              'n:{}, n_w:{}'.format(len(treated_w), treated_w.sum(), len(controlled_w), controlled_w.sum(),
+                                    len(golds_treatment), treated_w.sum() + controlled_w.sum()))
     hidden_val = np.asarray(hidden_val)  # original covariates, to be weighted
     hidden_treated, hidden_controlled = hidden_val[ones_idx], hidden_val[zeros_idx]
 
