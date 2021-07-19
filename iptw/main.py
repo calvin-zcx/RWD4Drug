@@ -634,6 +634,8 @@ if __name__ == "__main__":
         best_selection_val_smd = float('inf')
         validation_results_at_best = None
 
+        all_model_selection_evaluation = []
+
         for hyper_paras in tqdm(hyper_paras_list):
             i += 1
             hidden_size, lr, weight_decay, batch_size, dropout = hyper_paras
@@ -729,6 +731,8 @@ if __name__ == "__main__":
                     best_model_configure = hyper_paras
                     validation_results_at_best = (val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL)
 
+            all_model_selection_evaluation.extend(model_selection_evaluation)
+
             if best_model_iter == i:
                 best_model_selection_evaluation = model_selection_evaluation
 
@@ -749,6 +753,11 @@ if __name__ == "__main__":
                                                               "hyper-i", "hyper_paras", "hyper_paras_names"])
 
         model_selection_evaluation_pd.to_csv(args.save_model_filename + '_model-select.csv'.format(args.run_model))
+
+        all_model_selection_evaluation_pd = pd.DataFrame(all_model_selection_evaluation,
+                                                         columns=model_selection_evaluation_pd.columns)
+
+        all_model_selection_evaluation_pd.to_csv(args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
 
         # Final evaluation
         print('Training finished. Load PSModels in hyper-iter {} epoch {}, best configure \n {} \n {}'.format(
