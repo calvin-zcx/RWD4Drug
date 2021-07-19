@@ -602,10 +602,11 @@ if __name__ == "__main__":
         # paras_grid = {
         #     'hidden_size': [128],
         #     'lr': [1e-3],
-        #     'weight_decay': [1e-5],
+        #     'weight_decay': [1e-6],
         #     'batch_size': [32],
         #     'dropout': [0.5],
         # }
+
         paras_grid = {
             'hidden_size': [0, 32, 64, 128],
             'lr': [1e-2, 1e-3, 1e-4],
@@ -704,7 +705,7 @@ if __name__ == "__main__":
                       )
                 print('ATE_val:{} --> ATE_val_w: {}'.format(val_ATE_ALL[2], val_ATE_ALL[5]))
 
-                if (AUC_val > best_selection_val_auc) and (n_unbalanced_feat_w <= best_selection_val_smd):
+                if (AUC_val > best_selection_val_auc) and (max_unbalanced_weighted <= best_selection_val_smd):
                 # if (AUC_val > best_selection_val_auc):
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
                           ' Epoch: ', epoch, 'AUC_val:', AUC_val,
@@ -715,7 +716,7 @@ if __name__ == "__main__":
 
                     save_model(model, args.save_model_filename, model_params=model_params)
                     best_selection_val_auc = AUC_val
-                    best_selection_val_smd = n_unbalanced_feat_w
+                    best_selection_val_smd = max_unbalanced_weighted
                     best_model_epoch = epoch
                     best_model_iter = i
                     best_model_configure = hyper_paras
@@ -729,7 +730,7 @@ if __name__ == "__main__":
         )
         print('AUC_val:', best_selection_val_auc,
               'max_unbalanced_weighted:', validation_results_at_best[2][3],
-              'n_unbalanced_feat_w', best_selection_val_smd)
+              'n_unbalanced_feat_w', validation_results_at_best[2][5])
         print(hyper_paras_names)
         print(best_model_configure)
 
@@ -747,7 +748,7 @@ if __name__ == "__main__":
             best_model_iter, best_model_epoch, hyper_paras_names, best_model_configure))
 
         results_all_list = final_eval_deep(mlp.MLP, args, train_loader, val_loader, test_loader, data_loader,
-                        drug_name, feature_name, n_feature)
+                                           drug_name, feature_name, n_feature)
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
