@@ -433,8 +433,12 @@ def cal_deviation(hidden_val, golds_treatment, logits_treatment, normalized, ver
     hidden_controlled_mu, hidden_controlled_var = np.mean(hidden_controlled, axis=0), np.var(hidden_controlled, axis=0,
                                                                                              ddof=1)
     VAR = np.sqrt((hidden_treated_var + hidden_controlled_var) / 2)
-    hidden_deviation = np.abs(hidden_treated_mu - hidden_controlled_mu) / VAR
-    hidden_deviation[np.isnan(hidden_deviation)] = 0  # -1  # 0  # float('-inf') represent VAR is 0
+    # hidden_deviation = np.abs(hidden_treated_mu - hidden_controlled_mu) / VAR
+    # hidden_deviation[np.isnan(hidden_deviation)] = 0  # -1  # 0  # float('-inf') represent VAR is 0
+    hidden_deviation = np.divide(
+        np.abs(hidden_treated_mu - hidden_controlled_mu),
+        VAR, out=np.zeros_like(hidden_treated_mu), where=VAR != 0)
+
     max_unbalanced_original = np.max(hidden_deviation)
 
     # Weighted SMD
@@ -443,8 +447,12 @@ def cal_deviation(hidden_val, golds_treatment, logits_treatment, normalized, ver
     hidden_controlled_w_mu, hidden_controlled_w_var = weighted_mean(hidden_controlled, controlled_w), weighted_var(
         hidden_controlled, controlled_w)
     VAR_w = np.sqrt((hidden_treated_w_var + hidden_controlled_w_var) / 2)
-    hidden_deviation_w = np.abs(hidden_treated_w_mu - hidden_controlled_w_mu) / VAR_w
-    hidden_deviation_w[np.isnan(hidden_deviation_w)] = 0  # -1  # 0
+    # hidden_deviation_w = np.abs(hidden_treated_w_mu - hidden_controlled_w_mu) / VAR_w
+    # hidden_deviation_w[np.isnan(hidden_deviation_w)] = 0  # -1  # 0
+    hidden_deviation_w = np.divide(
+        np.abs(hidden_treated_w_mu - hidden_controlled_w_mu),
+        VAR_w, out=np.zeros_like(hidden_treated_w_mu), where=VAR_w != 0)
+
     max_unbalanced_weighted = np.max(hidden_deviation_w)
 
     return max_unbalanced_original, hidden_deviation, max_unbalanced_weighted, hidden_deviation_w

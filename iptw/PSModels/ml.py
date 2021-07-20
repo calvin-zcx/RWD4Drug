@@ -84,9 +84,9 @@ class PropensityEstimator:
 
             self.results.append((para_d, loss_train, auc_train, auc_val,
                                  max_smd, n_unbalanced_feature, max_smd_weighted,
-                                 n_unbalanced_feature_w))  # model,  not saving model for less disk
+                                 n_unbalanced_feature_w, para_d))  # model,  not saving model for less disk
 
-            if (max_smd_weighted <= self.best_balance):  # and (auc_val > self.best_val):  #
+            if (max_smd_weighted <= self.best_balance): # and (auc_val >= self.best_val):  #
                 self.best_model = model
                 self.best_hyper_paras = para_d
                 self.best_val = auc_val
@@ -100,7 +100,7 @@ class PropensityEstimator:
 
         self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss', 'train_auc', 'validation_auc',
                                                            "max_smd", "n_unbalanced_feature", "max_smd_weighted",
-                                                           "n_unbalanced_feature_w"])
+                                                           "n_unbalanced_feature_w", 'paras'])
         if verbose:
             self.report_stats()
 
@@ -114,7 +114,7 @@ class PropensityEstimator:
         print('Best fit value ', self.best_val, ' Global Best fit balue: ', self.global_best_val)
         print('Best balance: ', self.best_balance, ' Global Best balance: ', self.global_best_balance)
         pd.set_option('display.max_columns', None)
-        describe = self.results.decribe()
+        describe = self.results.describe()
         print('AUC stats:\n', describe)
         return describe
 

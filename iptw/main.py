@@ -564,6 +564,12 @@ if __name__ == "__main__":
                 'max_iter': [100, 200, 500],
                 'random_state': [args.random_seed],
             }
+            # paras_grid = {
+            #     'penalty': ['l1', 'l2'],
+            #     'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+            #     'max_iter': [100, 200, 500],
+            #     'random_state': [args.random_seed],
+            # }
         elif args.run_model == 'XGBOOST':
             paras_grid = {
                 'max_depth': [3, 4],
@@ -573,20 +579,20 @@ if __name__ == "__main__":
                 'random_state': [args.random_seed],
             }
         elif args.run_model == 'LIGHTGBM':
-            # paras_grid = {
-            #     'max_depth': [3, 4, 5],
-            #     'learning_rate': np.arange(0.01, 1, 0.1),
-            #     'num_leaves': np.arange(5, 50, 5),
-            #     'min_child_samples': np.arange(50, 300, 50),
-            #     'random_state': [args.random_seed],
-            # }
             paras_grid = {
-                'max_depth': [3, 4],
+                'max_depth': [3, 4, 5],
                 'learning_rate': np.arange(0.01, 1, 0.1),
                 'num_leaves': np.arange(5, 50, 5),
-                'min_child_samples': np.arange(100, 300, 50),
+                'min_child_samples': np.arange(50, 300, 50),
                 'random_state': [args.random_seed],
             }
+            # paras_grid = {
+            #     'max_depth': [3, 4],
+            #     'learning_rate': np.arange(0.01, 1, 0.1),
+            #     'num_leaves': np.arange(5, 50, 5),
+            #     'min_child_samples': np.arange(100, 300, 50),
+            #     'random_state': [args.random_seed],
+            # }
         else:
             paras_grid = {}
 
@@ -595,6 +601,7 @@ if __name__ == "__main__":
         with open(args.save_model_filename, 'wb') as f:
             pickle.dump(model, f)
 
+        model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
         # ----3. Evaluation learned PropensityEstimator
         results_all_list = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, test_x, test_t, test_y,
                       x, t, y, drug_name, feature_name, n_feature)
