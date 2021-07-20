@@ -708,7 +708,7 @@ if __name__ == "__main__":
                 val_max_smd, val_n_unbalanced_feat = val_SMD_ALL[0], val_SMD_ALL[2]
                 val_max_smd_iptw, val_n_unbalanced_feat_iptw = val_SMD_ALL[3], val_SMD_ALL[5]
 
-                # god view debug mode
+                # more for debug mode
                 train_IPTW_ALL, train_AUC_ALL, train_SMD_ALL, _, _ = model_eval_deep(
                     model, train_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
                 train_loss = train_IPTW_ALL[0]
@@ -716,6 +716,7 @@ if __name__ == "__main__":
                 train_max_smd, train_n_unbalanced_feat = train_SMD_ALL[0], train_SMD_ALL[2]
                 train_max_smd_iptw, train_n_unbalanced_feat_iptw = train_SMD_ALL[3], train_SMD_ALL[5]
 
+                # god view debug mode
                 all_IPTW_ALL, all_AUC_ALL, all_SMD_ALL, _, _ = model_eval_deep(
                     model, data_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
                 all_loss = all_IPTW_ALL[0]
