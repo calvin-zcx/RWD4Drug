@@ -144,11 +144,18 @@ def build_patient_dates(demo_file, dx_file, out_file):
             # dx_type = row[3]
 
             # First use ADMIT_DATE , then DX_DATE, then discard record
-            if (date == '') or (date == 'NULL'):
+            # if (date == '') or (date == 'NULL'):
+            #     n_no_date += 1
+            #     continue
+            # else:
+            #     try:
+            #     date = utils.str_to_datetime(date)
+            try:
+                date = utils.str_to_datetime(row[2])
+            except:
+                print('invalid date in ', n_records, row)
                 n_no_date += 1
                 continue
-            else:
-                date = utils.str_to_datetime(date)
 
             if date > max_date:
                 max_date = date
