@@ -132,6 +132,7 @@ def build_patient_dates(demo_file, dx_file, out_file):
                      for pid, val in id_demo.items()}  # (pid, bdate) in zip(df_demo['PATID'], df_demo['BIRTH_DATE'])
     n_records = 0
     n_no_date = 0
+    n_no_pid = 0
     min_date = datetime.max
     max_date = datetime.min
     with open(dx_file, 'r') as f:
@@ -153,6 +154,10 @@ def build_patient_dates(demo_file, dx_file, out_file):
                 max_date = date
             if date < min_date:
                 min_date = date
+
+            if patid not in patient_dates:
+                n_no_pid += 1
+                continue
 
             # 1-start diagnosis date
             if pd.isna(patient_dates[patid][1]) or date < patient_dates[patid][1]:
@@ -187,6 +192,7 @@ def build_patient_dates(demo_file, dx_file, out_file):
     print('len(patient_dates)', len(patient_dates))
     print('n_records', n_records)
     print('n_no_date', n_no_date)
+    print('n_no_pid', n_no_pid)
 
     utils.check_and_mkdir(out_file)
     pickle.dump(patient_dates, open(out_file, 'wb'))
