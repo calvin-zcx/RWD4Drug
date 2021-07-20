@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     parser.add_argument('--stats', action='store_true')
     # Deep PSModels
-    parser.add_argument('--batch_size', type=int, default=64) #64)
+    parser.add_argument('--batch_size', type=int, default=64)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-6)  # )0001)
     parser.add_argument('--epochs', type=int, default=20)  # 30
@@ -70,7 +70,10 @@ def parse_args():
         rseed = datetime.now()
     args.random_seed = rseed
     args.save_model_filename = os.path.join(args.output_dir, args.treated_drug,
-                                            args.treated_drug + '_S{}D{}C{}_{}'.format(args.random_seed, args.med_code_topk, args.controlled_drug, args.run_model))
+                                            args.treated_drug + '_S{}D{}C{}_{}'.format(args.random_seed,
+                                                                                       args.med_code_topk,
+                                                                                       args.controlled_drug,
+                                                                                       args.run_model))
     check_and_mkdir(args.save_model_filename)
 
     args.hidden_size = [int(x.strip()) for x in args.hidden_size.split(',')
@@ -597,14 +600,18 @@ if __name__ == "__main__":
             paras_grid = {}
 
         # ----2. Learning IPW using PropensityEstimator
-        model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
+        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
+        model = ml.PropensityEstimator(args.run_model, paras_grid).fit_godview(train_x, train_t, val_x, val_t, x, t)
+
         with open(args.save_model_filename, 'wb') as f:
             pickle.dump(model, f)
 
         model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
         # ----3. Evaluation learned PropensityEstimator
-        results_all_list = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, test_x, test_t, test_y,
-                      x, t, y, drug_name, feature_name, n_feature)
+        results_all_list = final_eval_ml(model, args, train_x, train_t, train_y,
+                                         val_x, val_t, val_y,
+                                         test_x, test_t, test_y,
+                                         x, t, y, drug_name, feature_name, n_feature)
 
     # %%  MLP PS Models
     if args.run_model == 'MLP':
@@ -653,7 +660,7 @@ if __name__ == "__main__":
             train_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size, sampler=train_sampler)
             print('len(train_loader): ', len(train_loader), 'train_loader.batch_size: ', train_loader.batch_size)
 
-            model_params = dict(input_size=n_feature, num_classes=2, hidden_size=hidden_size, dropout=dropout,)
+            model_params = dict(input_size=n_feature, num_classes=2, hidden_size=hidden_size, dropout=dropout, )
             print('Model: MLP')
             print(model_params)
             model = mlp.MLP(**model_params)
@@ -694,49 +701,59 @@ if __name__ == "__main__":
                 epoch_losses_ipw = np.mean(epoch_losses_ipw)
                 print('Hyper-para-iter: {}, Epoch: {}, IPW train loss: {}'.format(i, epoch, epoch_losses_ipw))
 
-                val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL = model_eval_deep(
-                    model, val_loader, verbose=1, normalized=False, cuda=args.cuda, report=4)
-                loss_val = val_IPTW_ALL[0]
-                AUC_val, AUC_val_iptw, AUC_val_expected = val_AUC_ALL[0], val_AUC_ALL[1], val_AUC_ALL[2]
-                max_unbalanced, hidden_deviation, max_unbalanced_weighted, hidden_deviation_w = val_SMD_ALL[0], val_SMD_ALL[
-                    1], val_SMD_ALL[3], val_SMD_ALL[4]
+                val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, _, _ = model_eval_deep(
+                    model, val_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
+                val_loss = val_IPTW_ALL[0]
+                val_AUC, val_AUC_iptw, val_AUC_expected = val_AUC_ALL[0], val_AUC_ALL[1], val_AUC_ALL[2]
+                val_max_smd, val_n_unbalanced_feat = val_SMD_ALL[0], val_SMD_ALL[2]
+                val_max_smd_iptw, val_n_unbalanced_feat_iptw = val_SMD_ALL[3], val_SMD_ALL[5]
 
-                n_unbalanced_feat_w = val_SMD_ALL[5]   # len(np.where(hidden_deviation_w > SMD_THRESHOLD)[0])
-                n_unbalanced_feat = val_SMD_ALL[2]   # len(np.where(hidden_deviation > SMD_THRESHOLD)[0])
+                # god view debug mode
+                train_IPTW_ALL, train_AUC_ALL, train_SMD_ALL, _, _ = model_eval_deep(
+                    model, train_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
+                train_loss = train_IPTW_ALL[0]
+                train_AUC, train_AUC_iptw, train_AUC_expected = train_AUC_ALL[0], train_AUC_ALL[1], train_AUC_ALL[2]
+                train_max_smd, train_n_unbalanced_feat = train_SMD_ALL[0], train_SMD_ALL[2]
+                train_max_smd_iptw, train_n_unbalanced_feat_iptw = train_SMD_ALL[3], train_SMD_ALL[5]
+
+                all_IPTW_ALL, all_AUC_ALL, all_SMD_ALL, _, _ = model_eval_deep(
+                    model, data_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
+                all_loss = all_IPTW_ALL[0]
+                all_AUC, all_AUC_iptw, all_AUC_expected = all_AUC_ALL[0], all_AUC_ALL[1], all_AUC_ALL[2]
+                all_max_smd, all_n_unbalanced_feat = all_SMD_ALL[0], all_SMD_ALL[2]
+                all_max_smd_iptw, all_n_unbalanced_feat_iptw = all_SMD_ALL[3], all_SMD_ALL[5]
+
                 model_selection_evaluation.append(
-                    [epoch, epoch_losses_ipw, loss_val, AUC_val, AUC_val_iptw, AUC_val_expected,
-                     np.abs(AUC_val-AUC_val_expected),
-                     max_unbalanced_weighted, n_unbalanced_feat_w,
-                     max_unbalanced, n_unbalanced_feat, i, hyper_paras, hyper_paras_names]
+                    [epoch, epoch_losses_ipw, i, hyper_paras, hyper_paras_names,
+                     val_loss, val_AUC, val_AUC_iptw, val_AUC_expected, np.abs(val_AUC - val_AUC_expected),
+                     val_max_smd_iptw, val_n_unbalanced_feat_iptw, val_max_smd, val_n_unbalanced_feat,
+                     train_AUC, train_AUC_iptw, train_AUC_expected, np.abs(train_AUC - train_AUC_expected),
+                     train_max_smd_iptw, train_n_unbalanced_feat_iptw, train_max_smd, train_n_unbalanced_feat,
+                     all_AUC, all_AUC_iptw, all_AUC_expected, np.abs(all_AUC - all_AUC_expected),
+                     all_max_smd_iptw, all_n_unbalanced_feat_iptw, all_max_smd, all_n_unbalanced_feat
+                     ],
                 )
 
-                print('Val loss_treament: {}, AUC_treatment: {}, '
-                      'AUC_treatment_IPTW: {}, AUC_val_expected:{}\n'
-                      'Max_unbalanced: {} --> Max_unbalanced_w: {} '
-                      'n_unbalanced_feat {} --> n_unbalanced_feat_w {}, '.
-                      format(loss_val, AUC_val,
-                             AUC_val_iptw, AUC_val_expected,
-                             max_unbalanced, max_unbalanced_weighted,
-                             n_unbalanced_feat, n_unbalanced_feat_w)
-                      )
-                print('ATE_val:{} --> ATE_val_w: {}'.format(val_ATE_ALL[2], val_ATE_ALL[5]))
+                print('Val loss_treament: {}, AUC_treatment: {}, AUC_treatment_IPTW: {}, val_AUC_expected:{}\n'
+                      'val_max_smd: {} -->val_max_smd_w: {} val_n_unbalanced_feat {} -->val_n_unbalanced_feat_iptw {}'.
+                      format(val_loss, val_AUC, val_AUC_iptw, val_AUC_expected,
+                             val_max_smd, val_max_smd_iptw, val_n_unbalanced_feat, val_n_unbalanced_feat_iptw))
 
-                if (max_unbalanced_weighted <= best_selection_val_smd):  #(AUC_val > best_selection_val_auc) and
-                # if (AUC_val > best_selection_val_auc):
+                if (val_max_smd_iptw <= best_selection_val_smd):  # (val_AUC > best_selection_val_auc) and
+                    # if (val_AUC > best_selection_val_auc):
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
-                          ' Epoch: ', epoch, 'AUC_val:', AUC_val,
-                          'max_unbalanced_weighted:', max_unbalanced_weighted,
-                          'n_unbalanced_feat_w', n_unbalanced_feat_w)
+                          ' Epoch: ', epoch, 'val_AUC:', val_AUC, 'val_max_smd_iptw:', val_max_smd_iptw,
+                          'val_n_unbalanced_feat_iptw', val_n_unbalanced_feat_iptw)
                     print(hyper_paras_names)
                     print(hyper_paras)
 
                     save_model(model, args.save_model_filename, model_params=model_params)
-                    best_selection_val_auc = AUC_val
-                    best_selection_val_smd = max_unbalanced_weighted
+                    best_selection_val_auc = val_AUC
+                    best_selection_val_smd = val_max_smd_iptw
                     best_model_epoch = epoch
                     best_model_iter = i
                     best_model_configure = hyper_paras
-                    validation_results_at_best = (val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL)
+                    validation_results_at_best = (val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL)
 
             all_model_selection_evaluation.extend(model_selection_evaluation)
 
@@ -746,25 +763,30 @@ if __name__ == "__main__":
         print('Model selection finished! Save Global Best PSModel at Hyper-iter [{}/{}], Epoch: {}'.format(
             i, len(hyper_paras_list), best_model_epoch)
         )
-        print('AUC_val:', best_selection_val_auc,
-              'max_unbalanced_weighted:', validation_results_at_best[2][3],
-              'n_unbalanced_feat_w', validation_results_at_best[2][5])
+        print('val_AUC:', best_selection_val_auc,
+              'val_max_smd_iptw:', validation_results_at_best[2][3],
+              'val_n_unbalanced_feat_iptw', validation_results_at_best[2][5])
         print(hyper_paras_names)
         print(best_model_configure)
 
-        model_selection_evaluation_pd = pd.DataFrame(best_model_selection_evaluation,
-                                                     columns=['epoch', 'loss_train', 'loss_val', 'AUC_val',
-                                                              'AUC_val_iptw', 'AUC_val_expected', 'expected-ori',
-                                                              'max_unbalanced_weighted', 'n_unbalanced_feat_w',
-                                                              'max_unbalanced', 'n_unbalanced_feat',
-                                                              "hyper-i", "hyper_paras", "hyper_paras_names"])
+        model_selection_evaluation_pd = pd.DataFrame(
+            best_model_selection_evaluation,
+            columns=["epoch", "epoch_losses_ipw", "i", "hyper_paras", "hyper_paras_names",
+                     "val_loss", "val_AUC", "val_AUC_iptw", "val_AUC_expected", "np.abs(val_AUC-val_AUC_expected)",
+                     "val_max_smd_iptw", "val_n_unbalanced_feat_iptw", "val_max_smd", "val_n_unbalanced_feat",
+                     "train_AUC", "train_AUC_iptw", "train_AUC_expected", "np.abs(train_AUC - train_AUC_expected)",
+                     "train_max_smd_iptw", "train_n_unbalanced_feat_iptw", "train_max_smd", "train_n_unbalanced_feat",
+                     "all_AUC", "all_AUC_iptw", "all_AUC_expected", "np.abs(all_AUC - all_AUC_expected)",
+                     "all_max_smd_iptw", "all_n_unbalanced_feat_iptw", "all_max_smd", "all_n_unbalanced_feat"
+                     ])
 
         model_selection_evaluation_pd.to_csv(args.save_model_filename + '_model-select.csv'.format(args.run_model))
 
         all_model_selection_evaluation_pd = pd.DataFrame(all_model_selection_evaluation,
                                                          columns=model_selection_evaluation_pd.columns)
 
-        all_model_selection_evaluation_pd.to_csv(args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
+        all_model_selection_evaluation_pd.to_csv(
+            args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
 
         # Final evaluation
         print('Training finished. Load PSModels in hyper-iter {} epoch {}, best configure \n {} \n {}'.format(
@@ -774,7 +796,6 @@ if __name__ == "__main__":
                                            drug_name, feature_name, n_feature)
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
-
 
 # if __name__ == "__main__":
 #     start_time = time.time()

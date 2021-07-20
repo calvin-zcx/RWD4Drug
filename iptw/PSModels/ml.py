@@ -52,62 +52,7 @@ class PropensityEstimator:
 
         self.results = []
 
-    # def fit(self, X_train, T_train, X_val, T_val, verbose=1):
-    #     start_time = time.time()
-    #     if verbose:
-    #         print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
-    #
-    #     for para_d in tqdm(self.paras_list):
-    #         if self.learner == 'LR':
-    #             if para_d.get('penalty', '') == 'l1':
-    #                 para_d['solver'] = 'liblinear'
-    #             else:
-    #                 para_d['solver'] = 'lbfgs'
-    #             model = LogisticRegression(**para_d).fit(X_train, T_train)
-    #         elif self.learner == 'XGBOOST':
-    #             model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
-    #         elif self.learner == 'LIGHTGBM':
-    #             model = lgb.LGBMClassifier(**para_d).fit(X_train, T_train)
-    #         else:
-    #             raise ValueError
-    #
-    #         T_val_predict = model.predict_proba(X_val)[:, 1]
-    #         auc_val = roc_auc_score(T_val, T_val_predict)
-    #         max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict,
-    #                                                               normalized=True, verbose=False)
-    #         n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-    #         n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
-    #
-    #         T_train_predict = model.predict_proba(X_train)[:, 1]
-    #         auc_train = roc_auc_score(T_train, T_train_predict)
-    #         loss_train = log_loss(T_train, T_train_predict)
-    #
-    #         self.results.append((para_d, loss_train, auc_train, auc_val,
-    #                              max_smd, n_unbalanced_feature, max_smd_weighted,
-    #                              n_unbalanced_feature_w))  # model,  not saving model for less disk
-    #
-    #         if (max_smd_weighted <= self.best_balance): # and (auc_val >= self.best_val):  #
-    #             self.best_model = model
-    #             self.best_hyper_paras = para_d
-    #             self.best_val = auc_val
-    #             self.best_balance = max_smd_weighted
-    #
-    #         if auc_val > self.global_best_val:
-    #             self.global_best_val = auc_val
-    #
-    #         if max_smd_weighted <= self.global_best_balance:
-    #             self.global_best_balance = max_smd_weighted
-    #
-    #     self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss', 'train_auc', 'validation_auc',
-    #                                                        "max_smd", "n_unbalanced_feature", "max_smd_weighted",
-    #                                                        "n_unbalanced_feature_w"])
-    #     if verbose:
-    #         self.report_stats()
-    #
-    #     print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
-    #     return self
-
-    def fit(self, X_train, T_train, X_val, T_val, X_test, T_test,verbose=1):
+    def fit(self, X_train, T_train, X_val, T_val, verbose=1):
         start_time = time.time()
         if verbose:
             print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
@@ -137,13 +82,6 @@ class PropensityEstimator:
             auc_train = roc_auc_score(T_train, T_train_predict)
             loss_train = log_loss(T_train, T_train_predict)
 
-            T_test_predict = model.predict_proba(X_test)[:, 1]
-            auc_test = roc_auc_score(T_test, T_test_predict)
-            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict,
-                                                                  normalized=True, verbose=False)
-            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
-
             self.results.append((para_d, loss_train, auc_train, auc_val,
                                  max_smd, n_unbalanced_feature, max_smd_weighted,
                                  n_unbalanced_feature_w))  # model,  not saving model for less disk
@@ -163,6 +101,80 @@ class PropensityEstimator:
         self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss', 'train_auc', 'validation_auc',
                                                            "max_smd", "n_unbalanced_feature", "max_smd_weighted",
                                                            "n_unbalanced_feature_w"])
+        if verbose:
+            self.report_stats()
+
+        print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+        return self
+
+    def fit_godview(self, X_train, T_train, X_val, T_val, X_all, T_all, verbose=1):
+        start_time = time.time()
+        if verbose:
+            print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
+
+        for para_d in tqdm(self.paras_list):
+            if self.learner == 'LR':
+                if para_d.get('penalty', '') == 'l1':
+                    para_d['solver'] = 'liblinear'
+                else:
+                    para_d['solver'] = 'lbfgs'
+                model = LogisticRegression(**para_d).fit(X_train, T_train)
+            elif self.learner == 'XGBOOST':
+                model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
+            elif self.learner == 'LIGHTGBM':
+                model = lgb.LGBMClassifier(**para_d).fit(X_train, T_train)
+            else:
+                raise ValueError
+
+            # validation data
+            T_val_predict = model.predict_proba(X_val)[:, 1]
+            auc_val = roc_auc_score(T_val, T_val_predict)
+            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict, normalized=True, verbose=False)
+            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
+            n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
+
+            # train data
+            T_train_predict = model.predict_proba(X_train)[:, 1]
+            auc_train = roc_auc_score(T_train, T_train_predict)
+            loss_train = log_loss(T_train, T_train_predict)
+            max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_train, T_train, T_train_predict, normalized=True, verbose=False)
+            n_unbalanced_feature_train = len(np.where(smd_train > SMD_THRESHOLD)[0])
+            n_unbalanced_feature_w_train = len(np.where(smd_w_train > SMD_THRESHOLD)[0])
+
+            # all data
+            T_all_predict = model.predict_proba(X_all)[:, 1]
+            auc_all = roc_auc_score(T_all, T_all_predict)
+            max_smd_all, smd_all, max_smd_weighted_all, smd_w_all = cal_deviation(X_all, T_all, T_all_predict, normalized=True, verbose=False)
+            n_unbalanced_feature_all = len(np.where(smd_all > SMD_THRESHOLD)[0])
+            n_unbalanced_feature_w_all = len(np.where(smd_w_all > SMD_THRESHOLD)[0])
+
+            self.results.append((para_d, loss_train,
+                                 auc_train, max_smd_train, n_unbalanced_feature_train, max_smd_weighted_train, n_unbalanced_feature_w_train,
+                                 auc_val, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_w,
+                                 auc_all, max_smd_all, n_unbalanced_feature_all, max_smd_weighted_all,  n_unbalanced_feature_w_all))  # model,  not saving model for less disk
+
+            if (max_smd_weighted <= self.best_balance):  # and (auc_val >= self.best_val):  #
+                self.best_model = model
+                self.best_hyper_paras = para_d
+                self.best_val = auc_val
+                self.best_balance = max_smd_weighted
+
+            if auc_val > self.global_best_val:
+                self.global_best_val = auc_val
+
+            if max_smd_weighted <= self.global_best_balance:
+                self.global_best_balance = max_smd_weighted
+
+        self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss',
+                                                           'train_auc',
+                                                           "max_smd_train", "n_unbalanced_feature_train",
+                                                           "max_smd_weighted_train", "n_unbalanced_feature_w_train",
+                                                           'validation_auc',
+                                                           "max_smd_val", "n_unbalanced_feature_val",
+                                                           "max_smd_weighted_val", "n_unbalanced_feature_w_val",
+                                                           'auc_all',
+                                                           "max_smd_all", "n_unbalanced_feature_all",
+                                                           "max_smd_weighted_all", "n_unbalanced_feature_w_all"])
         if verbose:
             self.report_stats()
 
