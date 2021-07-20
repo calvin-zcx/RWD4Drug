@@ -148,10 +148,9 @@ def build_patient_dates(demo_file, dx_file, out_file):
             #     n_no_date += 1
             #     continue
             # else:
-            #     try:
             #     date = utils.str_to_datetime(date)
             try:
-                date = utils.str_to_datetime(row[2])
+                date = utils.str_to_datetime(date)
             except:
                 print('invalid date in ', n_records, row)
                 n_no_date += 1
@@ -164,6 +163,7 @@ def build_patient_dates(demo_file, dx_file, out_file):
 
             if patid not in patient_dates:
                 n_no_pid += 1
+                print(patid, ' patients not in demographic files')
                 continue
 
             # 1-start diagnosis date
