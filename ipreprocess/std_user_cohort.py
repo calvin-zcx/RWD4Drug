@@ -40,6 +40,10 @@ def pre_user_cohort_triplet(prescription_taken_by_patient, user_cohort_rx, user_
         for patient, taken_times in taken_by_patient.items():
             drug_dates = prescription_taken_by_patient.get(drug).get(patient)
             index_date = drug_dates[0]
+
+            if patient not in patient_dates:
+                continue
+
             lastdx_date = patient_dates[patient][6]  # new added
             mci_date = patient_dates[patient][2]  # new added
             bdate = patient_dates[patient][0]  # new added

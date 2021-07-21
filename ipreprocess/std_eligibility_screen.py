@@ -28,6 +28,9 @@ def exclude(prescription_taken_by_patient, patient_dates, eligibility_criteria):
 
             # patient_dates: {0: 'birth_date',  1: '1st_diagnosis_date', 2: '1st_mci_date',
             #  3: '1st_AD_date', 4: '1st_dementia_date',  5: '1st_ADRD_date',  6: 'last_diagnosis_date'}
+            if patient not in patient_dates:
+                continue
+
             birth_date = patient_dates[patient][0]
             if pd.isna(patient_dates[patient][5]):
                 first_adrd_date = datetime.max
