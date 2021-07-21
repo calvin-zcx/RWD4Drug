@@ -361,6 +361,7 @@ if __name__ == "__main__":
     data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
                                               sampler=SubsetRandomSampler(indices))
 
+
     # %%  LSTM-PS PSModels
     if args.run_model == 'LSTM':
         print("**************************************************")
@@ -619,6 +620,9 @@ if __name__ == "__main__":
         print("**************************************************")
         print(args.run_model, ' PS model learning:')
 
+        trainval_sampler = SubsetRandomSampler(train_indices + val_indices)
+        trainval_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
+                                                      sampler=trainval_sampler)
         # PSModels configuration & training
         # paras_grid = {
         #     'hidden_size': [128],
@@ -709,8 +713,9 @@ if __name__ == "__main__":
                 val_max_smd_iptw, val_n_unbalanced_feat_iptw = val_SMD_ALL[3], val_SMD_ALL[5]
 
                 # more for debug mode
+                # Here use trainval_loader for train_loader --> train means train + validation!!!
                 train_IPTW_ALL, train_AUC_ALL, train_SMD_ALL, _, _ = model_eval_deep(
-                    model, train_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
+                    model, trainval_loader, verbose=1, normalized=False, cuda=args.cuda, report=3)
                 train_loss = train_IPTW_ALL[0]
                 train_AUC, train_AUC_iptw, train_AUC_expected = train_AUC_ALL[0], train_AUC_ALL[1], train_AUC_ALL[2]
                 train_max_smd, train_n_unbalanced_feat = train_SMD_ALL[0], train_SMD_ALL[2]
