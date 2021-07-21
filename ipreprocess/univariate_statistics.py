@@ -109,10 +109,11 @@ def build_patient_characteristics(id_demo, drug_taken_by_patient, patient_dates,
     df['antihypertensives'] = 0
     for drug, taken_by_patient in tqdm(drug_taken_by_patient.items()):
         for patient, take_times in taken_by_patient.items():
-            if is_antidiabetic(drug):
-                df.at[patient, 'antidiabetic'] += len(take_times)
-            if is_antihypertensives(drug):
-                df.at[patient, 'antihypertensives'] += len(take_times)
+            if patient in df.index:
+                if is_antidiabetic(drug):
+                    df.at[patient, 'antidiabetic'] += len(take_times)
+                if is_antihypertensives(drug):
+                    df.at[patient, 'antihypertensives'] += len(take_times)
 
     # 4. comorbidity
     for col in comorbidityname_2_id.keys():
