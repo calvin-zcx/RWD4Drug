@@ -107,12 +107,23 @@ class PropensityEstimator:
         print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
         return self
 
-    def fit_godview(self, X_train, T_train, X_val, T_val, X_all, T_all, verbose=1):
+    @staticmethod
+    def _evaluation_helper(X, T, T_pre):
+        loss =  log_loss(T, T_pre)
+        auc = roc_auc_score(T, T_pre)
+        max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, T_pre, normalized=True, verbose=False)
+        n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
+        n_unbalanced_feature_weighted = len(np.where(smd_w > SMD_THRESHOLD)[0])
+        result = (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
+        return result
+
+    def fit_godview(self, X_train, T_train, X_val, T_val, X_test, T_test, verbose=1):
         start_time = time.time()
         if verbose:
             print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
-
+        i = -1
         for para_d in tqdm(self.paras_list):
+            i += 1
             if self.learner == 'LR':
                 if para_d.get('penalty', '') == 'l1':
                     para_d['solver'] = 'liblinear'
@@ -126,71 +137,47 @@ class PropensityEstimator:
             else:
                 raise ValueError
 
-            # validation data
-            T_val_predict = model.predict_proba(X_val)[:, 1]
-            auc_val = roc_auc_score(T_val, T_val_predict)
-            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict, normalized=True, verbose=False)
-            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
+            T_train_pre = model.predict_proba(X_train)[:, 1]
+            T_val_pre = model.predict_proba(X_val)[:, 1]
+            T_test_pre = model.predict_proba(X_test)[:, 1]
 
-            # # train data
-            # T_train_predict = model.predict_proba(X_train)[:, 1]
-            # auc_train = roc_auc_score(T_train, T_train_predict)
-            # loss_train = log_loss(T_train, T_train_predict)
-            # max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_train, T_train,
-            #                                                                               T_train_predict,
-            #                                                                               normalized=True,
-            #                                                                               verbose=False)
-            # n_unbalanced_feature_train = len(np.where(smd_train > SMD_THRESHOLD)[0])
-            # n_unbalanced_feature_w_train = len(np.where(smd_w_train > SMD_THRESHOLD)[0])
+            result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
+            result_val = self._evaluation_helper(X_val, T_val, T_val_pre)
+            result_test = self._evaluation_helper(X_test, T_test, T_test_pre)
 
-            # trainval data
-            X_trainval = np.concatenate((X_train, X_val))
-            T_trainval = np.concatenate((T_train, T_val))
-            T_trainval_predict = model.predict_proba(X_trainval)[:, 1]
-            auc_train = roc_auc_score(T_trainval, T_trainval_predict)
-            loss_train = log_loss(T_trainval, T_trainval_predict)
-            max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_trainval, T_trainval, T_trainval_predict, normalized=True, verbose=False)
-            n_unbalanced_feature_train = len(np.where(smd_train > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_w_train = len(np.where(smd_w_train > SMD_THRESHOLD)[0])
+            result_trainval = self._evaluation_helper(
+                np.concatenate((X_train, X_val)),
+                np.concatenate((T_train, T_val)),
+                np.concatenate((T_train_pre, T_val_pre))
+            )
 
-            # all data
-            T_all_predict = model.predict_proba(X_all)[:, 1]
-            auc_all = roc_auc_score(T_all, T_all_predict)
-            max_smd_all, smd_all, max_smd_weighted_all, smd_w_all = cal_deviation(X_all, T_all, T_all_predict, normalized=True, verbose=False)
-            n_unbalanced_feature_all = len(np.where(smd_all > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_w_all = len(np.where(smd_w_all > SMD_THRESHOLD)[0])
+            result_all = self._evaluation_helper(
+                np.concatenate((X_train, X_val, X_test)),
+                np.concatenate((T_train, T_val, T_test)),
+                np.concatenate((T_train_pre, T_val_pre, T_test_pre))
+            )
 
-            self.results.append((para_d, loss_train,
-                                 auc_train, max_smd_train, n_unbalanced_feature_train, max_smd_weighted_train, n_unbalanced_feature_w_train,
-                                 auc_val, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_w,
-                                 auc_all, max_smd_all, n_unbalanced_feature_all, max_smd_weighted_all,  n_unbalanced_feature_w_all))  # model,  not saving model for less disk
+            self.results.append((i, para_d) + result_train + result_val + result_test + result_trainval + result_all)
 
-            if (max_smd_weighted_train < self.best_balance):  # and (auc_val >= self.best_val):  #
+            if (result_trainval[5] < self.best_balance) or \
+                    ((result_trainval[5] == self.best_balance) and (result_val[1] > self.best_val)):
                 self.best_model = model
                 self.best_hyper_paras = para_d
-                self.best_val = auc_val
-                self.best_balance = max_smd_weighted_train
+                self.best_val = result_val[1]
+                self.best_balance = result_trainval[5]
 
-            if auc_val > self.global_best_val:
-                self.global_best_val = auc_val
+            if result_val[1] > self.global_best_val:
+                self.global_best_val = result_val[1]
 
-            if max_smd_weighted_train <= self.global_best_balance:
-                self.global_best_balance = max_smd_weighted_train
+            if result_trainval[5] <= self.global_best_balance:
+                self.global_best_balance = result_trainval[5]
 
-        self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss',
-                                                           'train_auc',
-                                                           "max_smd_train", "n_unbalanced_feature_train",
-                                                           "max_smd_weighted_train", "n_unbalanced_feature_w_train",
-                                                           'validation_auc',
-                                                           "max_smd_val", "n_unbalanced_feature_val",
-                                                           "max_smd_weighted_val", "n_unbalanced_feature_w_val",
-                                                           'auc_all',
-                                                           "max_smd_all", "n_unbalanced_feature_all",
-                                                           "max_smd_weighted_all", "n_unbalanced_feature_w_all"])
+        name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
+        col_name = ['i', 'paras'] + [pre+x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
+        self.results = pd.DataFrame(self.results, columns=col_name)
+
         if verbose:
             self.report_stats()
-
         print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
         return self
 
@@ -198,8 +185,8 @@ class PropensityEstimator:
         print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
         print('Best model: ', self.best_model)
         print('Best configuration: ', self.best_hyper_paras)
-        print('Best fit value ', self.best_val, ' Global Best fit balue: ', self.global_best_val)
         print('Best balance: ', self.best_balance, ' Global Best balance: ', self.global_best_balance)
+        print('Best fit value ', self.best_val, ' Global Best fit balue: ', self.global_best_val)
         pd.set_option('display.max_columns', None)
         describe = self.results.describe()
         print('AUC stats:\n', describe)
@@ -213,6 +200,7 @@ class PropensityEstimator:
     def predict_loss(self, X, T):
         T_pre = self.predict_ps(X)
         return log_loss(T, T_pre)
+
 
 # class OutcomeEstimator:
 #     def __init__(self, learner, x_input, outcome, sample_weights=None):
