@@ -133,11 +133,24 @@ class PropensityEstimator:
             n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
             n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
 
-            # train data
-            T_train_predict = model.predict_proba(X_train)[:, 1]
-            auc_train = roc_auc_score(T_train, T_train_predict)
-            loss_train = log_loss(T_train, T_train_predict)
-            max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_train, T_train, T_train_predict, normalized=True, verbose=False)
+            # # train data
+            # T_train_predict = model.predict_proba(X_train)[:, 1]
+            # auc_train = roc_auc_score(T_train, T_train_predict)
+            # loss_train = log_loss(T_train, T_train_predict)
+            # max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_train, T_train,
+            #                                                                               T_train_predict,
+            #                                                                               normalized=True,
+            #                                                                               verbose=False)
+            # n_unbalanced_feature_train = len(np.where(smd_train > SMD_THRESHOLD)[0])
+            # n_unbalanced_feature_w_train = len(np.where(smd_w_train > SMD_THRESHOLD)[0])
+
+            # trainval data
+            X_trainval = np.concatenate((X_train, X_val))
+            T_trainval = np.concatenate((T_train, T_val))
+            T_trainval_predict = model.predict_proba(X_trainval)[:, 1]
+            auc_train = roc_auc_score(T_trainval, T_trainval_predict)
+            loss_train = log_loss(T_trainval, T_trainval_predict)
+            max_smd_train, smd_train, max_smd_weighted_train, smd_w_train = cal_deviation(X_trainval, T_trainval, T_trainval_predict, normalized=True, verbose=False)
             n_unbalanced_feature_train = len(np.where(smd_train > SMD_THRESHOLD)[0])
             n_unbalanced_feature_w_train = len(np.where(smd_w_train > SMD_THRESHOLD)[0])
 
@@ -153,17 +166,17 @@ class PropensityEstimator:
                                  auc_val, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_w,
                                  auc_all, max_smd_all, n_unbalanced_feature_all, max_smd_weighted_all,  n_unbalanced_feature_w_all))  # model,  not saving model for less disk
 
-            if (max_smd_weighted <= self.best_balance):  # and (auc_val >= self.best_val):  #
+            if (max_smd_weighted_train < self.best_balance):  # and (auc_val >= self.best_val):  #
                 self.best_model = model
                 self.best_hyper_paras = para_d
                 self.best_val = auc_val
-                self.best_balance = max_smd_weighted
+                self.best_balance = max_smd_weighted_train
 
             if auc_val > self.global_best_val:
                 self.global_best_val = auc_val
 
-            if max_smd_weighted <= self.global_best_balance:
-                self.global_best_balance = max_smd_weighted
+            if max_smd_weighted_train <= self.global_best_balance:
+                self.global_best_balance = max_smd_weighted_train
 
         self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss',
                                                            'train_auc',

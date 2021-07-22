@@ -564,8 +564,8 @@ if __name__ == "__main__":
         if args.run_model == 'LR':
             paras_grid = {
                 'penalty': ['l1', 'l2'],
-                'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
-                'max_iter': [100, 200, 500],
+                'C': [1e-4, 0.0005, 0.001, 0.002, 0.004, 0.08, 0.01, 0.02, 0.04, 0.05, 0.1, 0.2, 0.4, 0.5, 1, 2, 4, 5, 10, 15, 20],
+                'max_iter': [200],  # [100, 200, 500],
                 'random_state': [args.random_seed],
             }
             # paras_grid = {
@@ -720,6 +720,7 @@ if __name__ == "__main__":
                 train_AUC, train_AUC_iptw, train_AUC_expected = train_AUC_ALL[0], train_AUC_ALL[1], train_AUC_ALL[2]
                 train_max_smd, train_n_unbalanced_feat = train_SMD_ALL[0], train_SMD_ALL[2]
                 train_max_smd_iptw, train_n_unbalanced_feat_iptw = train_SMD_ALL[3], train_SMD_ALL[5]
+                trainval_max_smd_iptw = train_max_smd_iptw
 
                 # god view debug mode
                 all_IPTW_ALL, all_AUC_ALL, all_SMD_ALL, _, _ = model_eval_deep(
@@ -745,17 +746,18 @@ if __name__ == "__main__":
                       format(val_loss, val_AUC, val_AUC_iptw, val_AUC_expected,
                              val_max_smd, val_max_smd_iptw, val_n_unbalanced_feat, val_n_unbalanced_feat_iptw))
 
-                if (val_max_smd_iptw <= best_selection_val_smd):  # (val_AUC > best_selection_val_auc) and
+                if trainval_max_smd_iptw <= best_selection_val_smd:  # (val_AUC > best_selection_val_auc) and
                     # if (val_AUC > best_selection_val_auc):
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
                           ' Epoch: ', epoch, 'val_AUC:', val_AUC, 'val_max_smd_iptw:', val_max_smd_iptw,
-                          'val_n_unbalanced_feat_iptw', val_n_unbalanced_feat_iptw)
+                          'val_n_unbalanced_feat_iptw:', val_n_unbalanced_feat_iptw,
+                          'trainval_max_smd_iptw:', trainval_max_smd_iptw)
                     print(hyper_paras_names)
                     print(hyper_paras)
 
                     save_model(model, args.save_model_filename, model_params=model_params)
                     best_selection_val_auc = val_AUC
-                    best_selection_val_smd = val_max_smd_iptw
+                    best_selection_val_smd = trainval_max_smd_iptw  # val_max_smd_iptw
                     best_model_epoch = epoch
                     best_model_iter = i
                     best_model_configure = hyper_paras
