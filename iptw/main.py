@@ -594,7 +594,7 @@ if __name__ == "__main__":
         with open(args.save_model_filename, 'wb') as f:
             pickle.dump(model, f)
 
-        model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv'.format(args.run_model))
+        model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         # ----3. Evaluation learned PropensityEstimator
         results_all_list = final_eval_ml(model, args, train_x, train_t, train_y,
                                          val_x, val_t, val_y,
