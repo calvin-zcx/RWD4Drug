@@ -31,11 +31,11 @@ def shell_for_ml(cohort_dir_name, model):
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, 20):
                     cmd = "python main.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model LR --output_dir output/{}/{}/ --random_seed {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 --stats  " \
                           "2>&1 | tee output/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
-                        ctrl_type, cohort_dir_name, model, seed,
+                        ctrl_type, model, cohort_dir_name, model, seed,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
                     fo.write(cmd)
                     n += 1
