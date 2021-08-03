@@ -96,7 +96,6 @@ def shell_for_ml(cohort_dir_name, model):
 
 
 def results_model_selection_for_ml(cohort_dir_name, model):
-    N_DIM = 267
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -227,7 +226,6 @@ def results_model_selection_for_ml(cohort_dir_name, model):
 
 
 def results_model_selection_for_ml_step2(cohort_dir_name, model):
-    N_DIM = 267
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -277,7 +275,6 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model):
 
 
 def results_summarize_for_ml(cohort_dir_name, model):
-    N_DIM = 267
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]

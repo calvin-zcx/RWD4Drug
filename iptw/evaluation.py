@@ -6,7 +6,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.special import softmax
-from lifelines import KaplanMeierFitter
+from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import survival_difference_at_fixed_point_in_time_test
 import pandas as pd
 from utils import save_model, load_model, check_and_mkdir
@@ -110,8 +110,8 @@ def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1
         if verbose:
             print('max_smd_original:{}\tmax_smd_IPTW:{}\tn_unbalanced_feature_origin:{}\tn_unbalanced_feature_IPTW:{}'.
                   format(max_smd, max_smd_weighted, n_unbalanced_feature, n_unbalanced_feature_w))
-        else:
-            SMD_ALL = []
+    else:
+        SMD_ALL = []
 
     # 4. ATE score
     if report >= 4:
@@ -129,17 +129,19 @@ def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1
 
     # 5. Survival
     if report >= 5:
-        survival, survival_w = cal_survival_KM(T, PS_logits, Y, normalized)
+        survival, survival_w, cox_HR = cal_survival_KM(T, PS_logits, Y, normalized)
         kmf1, kmf0, ate, survival_1, survival_0, results = survival
         kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w = survival_w
-        KM_ALL = (survival, survival_w)
+        KM_ALL = (survival, survival_w, cox_HR)
         if verbose:
-            print('KM_treated at [180, 365, 540, 730]:', survival_1, 'KM_control at [180, 365, 540, 730]:', survival_0)
-            print('KM_treated - KM_control at [180, 365, 540, 730]:', ate)
+            print('KM_treated at [180, 365, 540, 730]:', survival_1,
+                  'KM_control at [180, 365, 540, 730]:', survival_0)
             # results.print_summary()
             print('KM_treated_IPTW at [180, 365, 540, 730]:', survival_1_w,
                   'KM_control_IPTW at [180, 365, 540, 730]:', survival_0_w)
-            print('KM_treated_IPTW - KM_control_IPTW at [180, 365, 540, 730]:', ate_w)
+            print('KM_treated - KM_control:', ate)
+            print('KM_treated_IPTW - KM_control_IPTW:', ate_w)
+            print('Cox Hazard ratio {} (CI: {})'.format(cox_HR[0], cox_HR[1]))
             # results_w.print_summary()
             ax = plt.subplot(111)
             ax.set_title(os.path.basename(figsave))
@@ -166,7 +168,7 @@ def model_eval_deep(model, dataloader, verbose=1, normalized=False, cuda=True, f
 
 
 def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, data_loader,
-                    drug_name, feature_name, n_feature):
+                    drug_name, feature_name, n_feature, dump_ori=True):
     mymodel = load_model(model_class, args.save_model_filename)
     mymodel.to(args.device)
 
@@ -205,6 +207,7 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
              [180, 365, 540, 730],
              tkm[0][3], tkm[0][4], tkm[0][2],
              tkm[1][3], tkm[1][4], tkm[1][2],
+             tkm[2][0], tkm[2][1],
              tw[1].sum(), tw[2].sum(),
              tw[3], tw[4], tw[5], tw[6],
              ';'.join(feature_name[np.where(tsmd[1] > SMD_THRESHOLD)[0]]),
@@ -220,15 +223,13 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
                                                        'unbalance_feature', 'unbalance_feature_IPTW'],
                                               index=['train', 'val', 'test', 'all'])
-    results_train_val_test_all.to_csv(args.save_model_filename + '_results.csv')
 
-    print('Dump to ', args.save_model_filename + '_results.csv')
     # SMD_ALL = (max_smd, smd, n_unbalanced_feature, max_smd_weighted, smd_w, n_unbalanced_feature_w)
     print('Unbalanced features SMD:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
           np.where(SMD_ALL[1] > SMD_THRESHOLD)[0])
@@ -244,14 +245,17 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
           feature_name[np.where(SMD_ALL[4] > SMD_THRESHOLD)[0]])
 
     results_train_val_test_all.to_csv(args.save_model_filename + '_results.csv')
-    with open(args.save_model_filename + '_results.pt', 'wb') as f:
-        pickle.dump(results_all_list + [feature_name, ], f)  #
+    print('Dump to ', args.save_model_filename + '_results.csv')
+    if dump_ori:
+        with open(args.save_model_filename + '_results.pt', 'wb') as f:
+            pickle.dump(results_all_list + [feature_name, ], f)  #
+            print('Dump to ', args.save_model_filename + '_results.pt')
 
-    return results_all_list
+    return results_all_list, results_train_val_test_all
 
 
 def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, test_x, test_t, test_y,
-                  x, t, y, drug_name, feature_name, n_feature):
+                  x, t, y, drug_name, feature_name, n_feature, dump_ori=True):
     # ----. Model Evaluation & Final ATE results
     # model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1, figsave='', report=5)
     print("*****" * 5, 'Evaluation on Train data:')
@@ -291,6 +295,7 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
              [180, 365, 540, 730],
              tkm[0][3], tkm[0][4], tkm[0][2],
              tkm[1][3], tkm[1][4], tkm[1][2],
+             tkm[2][0], tkm[2][1],
              tw[1].sum(), tw[2].sum(),
              tw[3], tw[4], tw[5], tw[6],
              ';'.join(feature_name[np.where(tsmd[1] > SMD_THRESHOLD)[0]]),
@@ -306,14 +311,13 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
                                                        'unbalance_feature', 'unbalance_feature_IPTW'],
                                               index=['train', 'val', 'test', 'all'])
-    results_train_val_test_all.to_csv(args.save_model_filename + '_results.csv')
-    print('Dump to ', args.save_model_filename + '_results.csv')
+
     # SMD_ALL = (max_smd, smd, n_unbalanced_feature, max_smd_weighted, smd_w, n_unbalanced_feature_w)
     print('Unbalanced features SMD:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
           np.where(SMD_ALL[1] > SMD_THRESHOLD)[0])
@@ -329,10 +333,13 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
           feature_name[np.where(SMD_ALL[4] > SMD_THRESHOLD)[0]])
 
     results_train_val_test_all.to_csv(args.save_model_filename + '_results.csv')
-    with open(args.save_model_filename + '_results.pt', 'wb') as f:
-        pickle.dump(results_all_list + [feature_name, ], f)  #
+    print('Dump to ', args.save_model_filename + '_results.csv')
+    if dump_ori:
+        with open(args.save_model_filename + '_results.pt', 'wb') as f:
+            pickle.dump(results_all_list + [feature_name, ], f)  #
+            print('Dump to ', args.save_model_filename + '_results.pt')
 
-    return results_all_list
+    return results_all_list, results_train_val_test_all
 
 
 # %%  Aux-functions
@@ -528,5 +535,19 @@ def cal_survival_KM(golds_treatment, logits_treatment, golds_outcome, normalized
     # kmf0_w.plot_survival_function(ax=ax)
     # plt.show()
 
+    # cox for hazard ratio
+    cph = CoxPHFitter()
+    event = golds_outcome[:, 0]
+    event[event==-1] = 0
+    weight = np.zeros(len(golds_treatment))
+    weight[ones_idx] = treated_w.squeeze()
+    weight[zeros_idx] = controlled_w.squeeze()
+    cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights':weight})
+    cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
+
+    HR = cph.hazard_ratios_['treatment']
+    CI = np.exp(cph.confidence_intervals_.values.reshape(-1))
+
     return (kmf1, kmf0, ate, survival_1, survival_0, results), \
-           (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w)
+           (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w), \
+           (HR, CI, cph)

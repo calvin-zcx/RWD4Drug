@@ -52,12 +52,23 @@ class PropensityEstimator:
 
         self.results = []
 
+    @staticmethod
+    def _evaluation_helper(X, T, T_pre):
+        loss =  log_loss(T, T_pre)
+        auc = roc_auc_score(T, T_pre)
+        max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, T_pre, normalized=True, verbose=False)
+        n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
+        n_unbalanced_feature_weighted = len(np.where(smd_w > SMD_THRESHOLD)[0])
+        result = (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
+        return result
+
     def fit(self, X_train, T_train, X_val, T_val, verbose=1):
         start_time = time.time()
         if verbose:
             print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)
-
+        i = -1
         for para_d in tqdm(self.paras_list):
+            i += 1
             if self.learner == 'LR':
                 if para_d.get('penalty', '') == 'l1':
                     para_d['solver'] = 'liblinear'
@@ -71,53 +82,43 @@ class PropensityEstimator:
             else:
                 raise ValueError
 
-            T_val_predict = model.predict_proba(X_val)[:, 1]
-            auc_val = roc_auc_score(T_val, T_val_predict)
-            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X_val, T_val, T_val_predict,
-                                                                  normalized=True, verbose=False)
-            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_w = len(np.where(smd_w > SMD_THRESHOLD)[0])
+            T_train_pre = model.predict_proba(X_train)[:, 1]
+            T_val_pre = model.predict_proba(X_val)[:, 1]
 
-            T_train_predict = model.predict_proba(X_train)[:, 1]
-            auc_train = roc_auc_score(T_train, T_train_predict)
-            loss_train = log_loss(T_train, T_train_predict)
+            result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
+            result_val = self._evaluation_helper(X_val, T_val, T_val_pre)
 
-            self.results.append((para_d, loss_train, auc_train, auc_val,
-                                 max_smd, n_unbalanced_feature, max_smd_weighted,
-                                 n_unbalanced_feature_w))  # model,  not saving model for less disk
+            result_trainval = self._evaluation_helper(
+                np.concatenate((X_train, X_val)),
+                np.concatenate((T_train, T_val)),
+                np.concatenate((T_train_pre, T_val_pre))
+            )
 
-            if (max_smd_weighted <= self.best_balance): # and (auc_val >= self.best_val):  #
+            self.results.append((i, para_d) + result_train + result_val + result_trainval)
+
+            if (result_trainval[5] < self.best_balance) or \
+                    ((result_trainval[5] == self.best_balance) and (result_val[1] > self.best_val)):
                 self.best_model = model
                 self.best_hyper_paras = para_d
-                self.best_val = auc_val
-                self.best_balance = max_smd_weighted
+                self.best_val = result_val[1]
+                self.best_balance = result_trainval[5]
 
-            if auc_val > self.global_best_val:
-                self.global_best_val = auc_val
+            if result_val[1] > self.global_best_val:
+                self.global_best_val = result_val[1]
 
-            if max_smd_weighted <= self.global_best_balance:
-                self.global_best_balance = max_smd_weighted
+            if result_trainval[5] <= self.global_best_balance:
+                self.global_best_balance = result_trainval[5]
 
-        self.results = pd.DataFrame(self.results, columns=['paras', 'train_loss', 'train_auc', 'validation_auc',
-                                                           "max_smd", "n_unbalanced_feature", "max_smd_weighted",
-                                                           "n_unbalanced_feature_w"])
+        name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
+        col_name = ['i', 'paras'] + [pre+x for pre in ['train_', 'val_',  'trainval_'] for x in name]
+        self.results = pd.DataFrame(self.results, columns=col_name)
+
         if verbose:
             self.report_stats()
-
         print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
         return self
 
-    @staticmethod
-    def _evaluation_helper(X, T, T_pre):
-        loss =  log_loss(T, T_pre)
-        auc = roc_auc_score(T, T_pre)
-        max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, T_pre, normalized=True, verbose=False)
-        n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-        n_unbalanced_feature_weighted = len(np.where(smd_w > SMD_THRESHOLD)[0])
-        result = (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
-        return result
-
-    def fit_godview(self, X_train, T_train, X_val, T_val, X_test, T_test, verbose=1):
+    def fit_and_test(self, X_train, T_train, X_val, T_val, X_test, T_test, verbose=1):
         start_time = time.time()
         if verbose:
             print('Model {} Searching Space N={}: '.format(self.learner, len(self.paras_list)), self.paras_grid)

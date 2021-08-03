@@ -361,7 +361,6 @@ if __name__ == "__main__":
     data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
                                               sampler=SubsetRandomSampler(indices))
 
-
     # %%  LSTM-PS PSModels
     if args.run_model == 'LSTM':
         print("**************************************************")
@@ -564,7 +563,7 @@ if __name__ == "__main__":
         if args.run_model == 'LR':
             paras_grid = {
                 'penalty': ['l1', 'l2'],
-                'C': 10**np.arange(-3, 3, 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+                'C': 10 ** np.arange(-3, 3, 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
                 'max_iter': [200],  # [100, 200, 500],
                 'random_state': [args.random_seed],
             }
@@ -589,17 +588,17 @@ if __name__ == "__main__":
 
         # ----2. Learning IPW using PropensityEstimator
         # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
-        model = ml.PropensityEstimator(args.run_model, paras_grid).fit_godview(train_x, train_t, val_x, val_t, test_x, test_t)
+        model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
+                                                                                test_t)
 
         with open(args.save_model_filename, 'wb') as f:
             pickle.dump(model, f)
 
         model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         # ----3. Evaluation learned PropensityEstimator
-        results_all_list = final_eval_ml(model, args, train_x, train_t, train_y,
-                                         val_x, val_t, val_y,
-                                         test_x, test_t, test_y,
-                                         x, t, y, drug_name, feature_name, n_feature)
+        results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
+                                                         test_x, test_t, test_y, x, t, y,
+                                                         drug_name, feature_name, n_feature, dump_ori=False)
 
     # %%  MLP PS Models
     if args.run_model == 'MLP':
@@ -787,8 +786,8 @@ if __name__ == "__main__":
         print('Training finished. Load PSModels in hyper-iter {} epoch {}, best configure \n {} \n {}'.format(
             best_model_iter, best_model_epoch, hyper_paras_names, best_model_configure))
 
-        results_all_list = final_eval_deep(mlp.MLP, args, train_loader, val_loader, test_loader, data_loader,
-                                           drug_name, feature_name, n_feature)
+        results_all_list, results_all_df = final_eval_deep(mlp.MLP, args, train_loader, val_loader, test_loader,
+                                                           data_loader, drug_name, feature_name, n_feature)
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
