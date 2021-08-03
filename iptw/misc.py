@@ -2,9 +2,6 @@ import os
 import shutil
 import zipfile
 
-import urllib.parse
-import urllib.request
-
 import torch
 import torch.utils.data
 from dataset import *
@@ -17,7 +14,6 @@ from collections import Counter, defaultdict
 import pandas as pd
 from utils import check_and_mkdir
 from scipy import stats
-# import re
 
 
 def stringlist_2_list(s):
