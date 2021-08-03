@@ -17,7 +17,6 @@ from scipy import stats
 
 
 def stringlist_2_list(s):
-
     r = s.strip('][').replace(',', ' ').split()
     r = list(map(float, r))
     return r
@@ -38,13 +37,13 @@ def bootstrap_mean_ci(x, B=1000, alpha=0.05):
     # Generate boostrap distribution of sample mean
     xboot = boot_matrix(x, B=B)
     sampling_distribution = xboot.mean(axis=1)
-    quantile_confidence_interval = np.percentile(sampling_distribution, q=(100*alpha/2, 100*(1-alpha/2)))
+    quantile_confidence_interval = np.percentile(sampling_distribution, q=(100 * alpha / 2, 100 * (1 - alpha / 2)))
     # if plot:
     #     plt.hist(sampling_distribution, bins="fd")
     return quantile_confidence_interval
 
 
-def bootstrap_mean_pvalue(x, expected_mean=0, B=1000):
+def bootstrap_mean_pvalue(x, expected_mean=0., B=1000):
     """
     Ref:
     1. https://en.wikipedia.org/wiki/Bootstrapping_(statistics)#cite_note-:0-1
@@ -60,7 +59,7 @@ def bootstrap_mean_pvalue(x, expected_mean=0, B=1000):
     x_boots_mean = x_boots.mean(axis=1)
     t_boots = (x_boots_mean - expected_mean) / (x_boots.std(axis=1, ddof=1) / np.sqrt(n))
     p = np.mean(t_boots >= orig[0])
-    p_final = 2*min(p, 1-p)
+    p_final = 2 * min(p, 1 - p)
     # Plot bootstrap distribution
     # if plot:
     #     plt.figure()
@@ -68,7 +67,7 @@ def bootstrap_mean_pvalue(x, expected_mean=0, B=1000):
     return p_final, orig
 
 
-def shell_for_ml(cohort_dir_name, model):
+def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
 
@@ -77,10 +76,10 @@ def shell_for_ml(cohort_dir_name, model):
     n = 0
     for x in name_cnt:
         k, v = x
-        if v >= 500:
+        if v >= min_patients:
             drug = k.split('.')[0]
             for ctrl_type in ['random', 'atc']:
-                for seed in range(0, 20):
+                for seed in range(0, iter):
                     cmd = "python main.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
                           "--controlled_drug {} --run_model {} --output_dir output/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 --stats  " \
@@ -225,6 +224,9 @@ def results_model_selection_for_ml(cohort_dir_name, model):
     print()
 
 
+# def ASTD_IQR(s):
+#     return '{:.2f} ({:.2f}), {:.2f} ([{:.2f}, {:.2f}])'.format(s.mean(), s.std(),
+#                                                                s.quantile(.5), s.quantile(.25), s.quantile(.75))
 def results_model_selection_for_ml_step2(cohort_dir_name, model):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
@@ -257,14 +259,14 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model):
             #     ["val_auc_testauc", "val_maxsmd_testauc", "val_nsmd_testauc",
             #      "train_maxsmd_testauc", "train_nsmd_testauc", "trainval_maxsmd_testauc",
             #      "trainval_nsmd_testauc", 'trainval_final_testnauc'])
-            for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd",  "trainval_final_finalnsmd"],
+            for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "trainval_final_finalnsmd"],
                               ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
                 success_rate = (rdf.loc[idx, c1] <= 5).mean()
                 success_rate_std = (rdf.loc[idx, c1] <= 5).std()
                 test_auc = (rdf.loc[idx, c2]).mean()
                 test_auc_std = (rdf.loc[idx, c2]).std()
                 r.extend([success_rate, success_rate_std, test_auc, test_auc_std])
-                col_name.extend([c1, c1+'_std', c2, c2+'_std'])
+                col_name.extend([c1, c1 + '_std', c2, c2 + '_std'])
 
             results.append(r)
         df = pd.DataFrame(results, columns=col_name)
@@ -274,7 +276,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model):
     print()
 
 
-def results_summarize_for_ml(cohort_dir_name, model):
+def results_ATE_for_ml(cohort_dir_name, model):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -302,7 +304,7 @@ def results_summarize_for_ml(cohort_dir_name, model):
                           "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW"]:
                     r.loc[c] = stringlist_2_list(r.loc[c])[-1]
                 r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                                   index=['fname', 'ctrl_type']).append(r)
+                              index=['fname', 'ctrl_type']).append(r)
                 results.append(r)
         rdf = pd.DataFrame(results)
         rdf.to_excel(dirname + 'results/' + drug + '_results.xlsx')
@@ -310,16 +312,18 @@ def results_summarize_for_ml(cohort_dir_name, model):
 
 
 if __name__ == '__main__':
-    rvs = stats.norm.rvs(loc=0, scale=10, size=(500, 1))
-    ci = bootstrap_mean_ci(rvs)
-    p, test_orig = bootstrap_mean_pvalue(rvs, expected_mean=0., B=1000)
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
+    # test bootstrap method
+    # rvs = stats.norm.rvs(loc=0, scale=10, size=(500, 1))
+    # ci = bootstrap_mean_ci(rvs)
+    # p, test_orig = bootstrap_mean_pvalue(rvs, expected_mean=0., B=1000)
+
+    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
     # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model='LR')
 
-    results_summarize_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
+    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
 
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
+    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
 
     print('Done')
