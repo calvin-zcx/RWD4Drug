@@ -67,7 +67,7 @@ def bootstrap_mean_pvalue(x, expected_mean=0., B=1000):
     return p_final, orig
 
 
-def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500):
+def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500, stats=True):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
 
@@ -82,10 +82,10 @@ def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500):
                 for seed in range(0, iter):
                     cmd = "python main.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
                           "--controlled_drug {} --run_model {} --output_dir output/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 --stats  " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} " \
                           "2>&1 | tee output/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
-                        ctrl_type, model, cohort_dir_name, model, seed,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '',
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
                     fo.write(cmd)
                     n += 1
@@ -323,7 +323,7 @@ if __name__ == '__main__':
 
     # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
 
-    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
+    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', stats=False)
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
 
     print('Done')
