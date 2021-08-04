@@ -543,10 +543,13 @@ def cal_survival_KM(golds_treatment, logits_treatment, golds_outcome, normalized
     weight[ones_idx] = treated_w.squeeze()
     weight[zeros_idx] = controlled_w.squeeze()
     cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights':weight})
-    cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
+    try:
+        cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
 
-    HR = cph.hazard_ratios_['treatment']
-    CI = np.exp(cph.confidence_intervals_.values.reshape(-1))
+        HR = cph.hazard_ratios_['treatment']
+        CI = np.exp(cph.confidence_intervals_.values.reshape(-1))
+    except:
+        cph = HR = CI = None
 
     return (kmf1, kmf0, ate, survival_1, survival_0, results), \
            (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w), \

@@ -14,6 +14,15 @@ from collections import Counter, defaultdict
 import pandas as pd
 from utils import check_and_mkdir
 from scipy import stats
+import re
+import itertools
+import functools
+
+
+print = functools.partial(print, flush=True)
+
+
+MAX_NO_UNBALANCED_FEATURE = 5
 
 
 def stringlist_2_list(s):
@@ -70,13 +79,30 @@ def bootstrap_mean_pvalue(x, expected_mean=0., B=1000):
 def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500, stats=True):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
-
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+            added_drug.extend(gpi)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
     fo.write('mkdir -p output/{}/{}/log\n'.format(cohort_dir_name, model))
     n = 0
     for x in name_cnt:
         k, v = x
-        if v >= min_patients:
+        if (v >= min_patients) or (k in added_drug):
             drug = k.split('.')[0]
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, iter):
@@ -94,7 +120,7 @@ def shell_for_ml(cohort_dir_name, model, iter=50, min_patients=500, stats=True):
     print('In total ', n, ' commands')
 
 
-def results_model_selection_for_ml(cohort_dir_name, model):
+def results_model_selection_for_ml(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -102,10 +128,6 @@ def results_model_selection_for_ml(cohort_dir_name, model):
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
-
-    with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
-        drug_name = pickle.load(f)
-        print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
     for drug in drug_list:
         results = []
@@ -224,10 +246,11 @@ def results_model_selection_for_ml(cohort_dir_name, model):
     print()
 
 
-# def ASTD_IQR(s):
-#     return '{:.2f} ({:.2f}), {:.2f} ([{:.2f}, {:.2f}])'.format(s.mean(), s.std(),
-#                                                                s.quantile(.5), s.quantile(.25), s.quantile(.75))
-def results_model_selection_for_ml_step2(cohort_dir_name, model):
+def IQR(s):
+    return [np.quantile(s, .5), np.quantile(s, .25), np.quantile(s, .75)]
+
+
+def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -235,10 +258,6 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model):
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
-
-    with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
-        drug_name = pickle.load(f)
-        print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
     writer = pd.ExcelWriter(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), engine='xlsxwriter')
     for t in ['random', 'atc', 'all']:
@@ -261,22 +280,39 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model):
             #      "trainval_nsmd_testauc", 'trainval_final_testnauc'])
             for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "trainval_final_finalnsmd"],
                               ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
-                success_rate = (rdf.loc[idx, c1] <= 5).mean()
-                success_rate_std = (rdf.loc[idx, c1] <= 5).std()
-                test_auc = (rdf.loc[idx, c2]).mean()
-                test_auc_std = (rdf.loc[idx, c2]).std()
-                r.extend([success_rate, success_rate_std, test_auc, test_auc_std])
-                col_name.extend([c1, c1 + '_std', c2, c2 + '_std'])
+                nsmd = rdf.loc[idx, c1]
+                auc = rdf.loc[idx, c2]
+
+                nsmd_med = IQR(nsmd)[0]
+                nsmd_iqr = IQR(nsmd)[1:]
+
+                nsmd_mean = nsmd.mean()
+                nsmd_mean_ci = bootstrap_mean_ci(nsmd, alpha=0.05)
+
+                success_rate = (nsmd <= MAX_NO_UNBALANCED_FEATURE).mean()
+                success_rate_ci = bootstrap_mean_ci(nsmd <= MAX_NO_UNBALANCED_FEATURE, alpha=0.05)
+
+                auc_med = IQR(auc)[0]
+                auc_iqr = IQR(auc)[1:]
+
+                auc_mean = auc.mean()
+                auc_mean_ci = bootstrap_mean_ci(auc, alpha=0.05)
+
+                r.extend([nsmd_med, nsmd_iqr, nsmd_mean, nsmd_mean_ci, success_rate, success_rate_ci,
+                          auc_med, auc_iqr, auc_mean, auc_mean_ci])
+                col_name.extend(
+                    ["nsmd_med-" + c1, "nsmd_iqr-" + c1, "nsmd_mean-" + c1, "nsmd_mean_ci-" + c1,
+                     "success_rate-" + c1, "success_rate_ci-" + c1,
+                     "auc_med-" + c2, "auc_iqr-" + c2, "auc_mean-" + c2, "auc_mean_ci-" + c2])
 
             results.append(r)
         df = pd.DataFrame(results, columns=col_name)
         df.to_excel(writer, sheet_name=t)
-        print()
     writer.save()
     print()
 
 
-def results_ATE_for_ml(cohort_dir_name, model):
+def results_ATE_for_ml(cohort_dir_name, model, dug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
@@ -284,10 +320,6 @@ def results_ATE_for_ml(cohort_dir_name, model):
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
-
-    with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
-        drug_name = pickle.load(f)
-        print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
     for drug in drug_list:
         results = []
@@ -311,19 +343,130 @@ def results_ATE_for_ml(cohort_dir_name, model):
     print('Done')
 
 
+def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+    drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
+    drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
+    check_and_mkdir(dirname + 'results/')
+
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), engine='xlsxwriter')
+    for t in ['random', 'atc', 'all']:
+        results = []
+        for drug in drug_list:
+            rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
+
+            if t != 'all':
+                idx = (rdf['ctrl_type'] == t)
+            else:
+                idx = (rdf['ctrl_type'].notna())
+
+            # Only select balanced trial
+            idx = idx & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
+            print('drug: ', drug, t, 'support:', idx.sum())
+            r = [drug, drug_name.get(drug, ''), cohort_size.get(drug+'.pkl'), idx.sum()]
+            col_name = ['drug', 'drug_name', 'n_treat_size', 'support']
+
+            for c in ["n_treat", "n_ctrl", "n_feature"]:  # , 'HR_IPTW', 'HR_IPTW_CI'
+                nv = rdf.loc[idx, c]
+                nv_mean = nv.mean()
+                r.append(nv_mean)
+                col_name.append(c)
+
+            for c in ["n_unbalanced_feature", "n_unbalanced_feature_IPTW",
+                      "ATE_original", "ATE_IPTW",
+                      "KM1-0_original", "KM1-0_IPTW"]:  # , 'HR_IPTW', 'HR_IPTW_CI'
+                nv = rdf.loc[idx, c]
+                if len(nv) > 0:
+                    med = IQR(nv)[0]
+                    iqr = IQR(nv)[1:]
+
+                    mean = nv.mean()
+                    mean_ci = bootstrap_mean_ci(nv, alpha=0.05)
+
+                    p, _ = bootstrap_mean_pvalue(nv, 0)
+
+                    r.extend([med, iqr, mean, mean_ci, p])
+                else:
+                    r.extend([np.nan, np.nan, np.nan, np.nan, np.nan])
+                col_name.extend(["med-"+c, "iqr-"+c, "mean-"+c, "mean_ci-"+c, 'pvalue-'+c])
+
+            results.append(r)
+        df = pd.DataFrame(results, columns=col_name)
+        df.to_excel(writer, sheet_name=t)
+    writer.save()
+    print()
+
+
+def check_drug_name_code():
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    rx_df = pd.read_csv(r'../ipreprocess/output/save_cohort_all_loose/cohort_all_name_size_positive_loose.csv',
+                        index_col='cohort_name', dtype=str)
+    gpi_df = pd.read_csv(r'../ipreprocess/output_marketscan/save_cohort_all_loose/cohort_all_name_size_positive.csv',
+                         index_col='cohort_name', dtype=str)
+
+    df['rx_drug_name'] = ''
+    df['rx_n_patients'] = ''
+    df['rx_n_pos'] = ''
+    df['rx_pos_ratio'] = ''
+
+    df['gpi_drug_name'] = ''
+    df['gpi_n_patients'] = ''
+    df['gpi_n_pos'] = ''
+    df['gpi_pos_ratio'] = ''
+
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        # print(index, row)
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+        else:
+            rx = []
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+        else:
+            gpi = []
+
+        for r in rx:
+            if r in rx_df.index:
+                df.loc[index, 'rx_drug_name'] += ('+' + rx_df.loc[r, 'drug_name'])
+                df.loc[index, 'rx_n_patients'] += ('+' + rx_df.loc[r, 'n_patients'])
+                df.loc[index, 'rx_n_pos'] += ('+' + rx_df.loc[r, 'n_pos'])
+                df.loc[index, 'rx_pos_ratio'] += ('+' + rx_df.loc[r, 'pos_ratio'])
+
+        for r in gpi:
+            if r in gpi_df.index:
+                df.loc[index, 'gpi_drug_name'] += ('+' + gpi_df.loc[r, 'drug_name'])
+                df.loc[index, 'gpi_n_patients'] += ('+' + gpi_df.loc[r, 'n_patients'])
+                df.loc[index, 'gpi_n_pos'] += ('+' + gpi_df.loc[r, 'n_pos'])
+                df.loc[index, 'gpi_pos_ratio'] += ('+' + gpi_df.loc[r, 'pos_ratio'])
+
+    df.to_excel(r'../data/repurposed_AD_under_trials_20200227-CHECK.xlsx')
+    return df
+
+
 if __name__ == '__main__':
+    # check_drug_name_code()
     # test bootstrap method
     # rvs = stats.norm.rvs(loc=0, scale=10, size=(500, 1))
     # ci = bootstrap_mean_ci(rvs)
     # p, test_orig = bootstrap_mean_pvalue(rvs, expected_mean=0., B=1000)
 
-    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
-    # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model='LR')
+    with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
+        drug_name = pickle.load(f)
+        print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
-    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
+    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR')
+    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', drug_name=drug_name)
+    # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model='LR', drug_name=drug_name)
+    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', drug_name=drug_name)
+    # results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model='LR', drug_name=drug_name)
 
     shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', stats=False)
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM')
+    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
 
     print('Done')
