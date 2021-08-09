@@ -54,7 +54,7 @@ class PropensityEstimator:
 
     @staticmethod
     def _evaluation_helper(X, T, T_pre):
-        loss =  log_loss(T, T_pre)
+        loss = log_loss(T, T_pre)
         auc = roc_auc_score(T, T_pre)
         max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, T_pre, normalized=True, verbose=False)
         n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
@@ -110,7 +110,7 @@ class PropensityEstimator:
                 self.global_best_balance = result_trainval[5]
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'paras'] + [pre+x for pre in ['train_', 'val_',  'trainval_'] for x in name]
+        col_name = ['i', 'paras'] + [pre + x for pre in ['train_', 'val_', 'trainval_'] for x in name]
         self.results = pd.DataFrame(self.results, columns=col_name)
 
         if verbose:
@@ -174,7 +174,7 @@ class PropensityEstimator:
                 self.global_best_balance = result_trainval[5]
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'paras'] + [pre+x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
+        col_name = ['i', 'paras'] + [pre + x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
         self.results = pd.DataFrame(self.results, columns=col_name)
 
         if verbose:
@@ -201,7 +201,6 @@ class PropensityEstimator:
     def predict_loss(self, X, T):
         T_pre = self.predict_ps(X)
         return log_loss(T, T_pre)
-
 
 # class OutcomeEstimator:
 #     def __init__(self, learner, x_input, outcome, sample_weights=None):

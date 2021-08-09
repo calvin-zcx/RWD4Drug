@@ -627,6 +627,8 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random'):
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
     plt.tight_layout()
+    fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}.png'.format(model, contrl_type))
+    fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -665,6 +667,8 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random'):
         data_3.append((rdf.loc[idx, "trainval_final_testnauc"]))
         p1, test_orig1 = bootstrap_mean_pvalue_2samples(data_3[-1], data_1[-1])
         p2, test_orig2 = bootstrap_mean_pvalue_2samples(data_3[-1], data_2[-1])
+        # test_orig1_man = stats.mannwhitneyu(data_3[-1], data_1[-1])
+        # test_orig2_man = stats.mannwhitneyu(data_3[-1], data_2[-1])
         data_pvalue.append([test_orig1[1], test_orig2[1]])
 
     fig, ax = plt.subplots(figsize=(18, 8))
@@ -726,6 +730,8 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random'):
 
     ax.set_xmargin(0.01)
     plt.tight_layout()
+    fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}.png'.format(model, contrl_type))
+    fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -745,22 +751,20 @@ if __name__ == '__main__':
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
-    model = 'LR' #'LIGHTGBM'  #
+    model = 'LIGHTGBM'  #'LR' #
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
+    results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
+    results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
+    results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
 
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
 
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-
-
 
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)

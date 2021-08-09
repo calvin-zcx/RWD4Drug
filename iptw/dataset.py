@@ -82,7 +82,6 @@ class Dataset(torch.utils.data.Dataset):
         col_name = (diag_col_name, med_col_name, ['sex'], ['age'], ['days'])
         self.FEATURE_NAME = np.asarray(sum(col_name, []))
 
-
     def _process_visits(self, visits, max_len_visit, vocab):
         res = np.zeros((max_len_visit, len(vocab)))
         for i, visit in enumerate(visits):
