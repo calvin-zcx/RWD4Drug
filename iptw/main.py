@@ -737,8 +737,9 @@ if __name__ == "__main__":
                 results.append(
                     (i_iter, i, epoch, hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
 
-                print('HyperPara-i: {}, Epoch: {}, train loss: {}, balance: {}, auc: {}'.format(
-                    i, epoch, epoch_losses_ipw, result_trainval[5], result_val[1])
+                print('HP-i:{}, epoch:{}, loss:{}\n'
+                      'trainval-balance:{}, all-balance:{}, val-auc:{}, test-auc:{}'.format(
+                    i, epoch, epoch_losses_ipw, result_trainval[5], result_all[5], result_val[1], result_test[1])
                 )
 
                 if (result_trainval[5] < best_balance) or \
