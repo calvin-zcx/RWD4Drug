@@ -750,7 +750,8 @@ if __name__ == "__main__":
                     best_balance = result_trainval[5]
                     best_model_epoch = epoch
                     print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
-                          ' Epoch: ', epoch, 'trainval-balance:', best_balance, 'val-auc:', best_auc)
+                          'Epoch: ', epoch, 'trainval-balance:', best_balance, 'val-auc:', best_auc,
+                          "all-balance", result_all[5], "test-auc", result_test[1])
                     print(hyper_paras_names)
                     print(hyper_paras)
                     save_model(model, args.save_model_filename, model_params=model_params)
