@@ -161,6 +161,22 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True)
     print('In total ', n, ' commands')
 
 
+def split_shell_file(fname, divide=2, skip_first=1):
+    f = open(fname, 'r')
+    content_list = f.readlines()
+    n = len(content_list)
+    n_d = np.ceil((n-skip_first)/divide)
+    seg = [0, ] + [int(i*n_d + skip_first) for i in range(1, divide)] +[n]
+    for i in range(divide):
+        fout_name = fname.split('.')
+        fout_name = ''.join(fout_name[:-1]) + '-' + str(i) + '.'+fout_name[-1]
+        fout = open(fout_name, 'w')
+        for l in content_list[seg[i]:seg[i+1]]:
+            fout.write(l)
+        fout.close()
+    print('dump done')
+
+
 def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
@@ -770,5 +786,6 @@ if __name__ == '__main__':
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
 
-    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
+    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
+    split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
     print('Done')
