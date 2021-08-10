@@ -707,7 +707,6 @@ if __name__ == "__main__":
                 # just finish 1 epoch
                 # scheduler.step()
                 epoch_losses_ipw = np.mean(epoch_losses_ipw)
-                print('Hyper-para-iter: {}, Epoch: {}, IPW train loss: {}'.format(i, epoch, epoch_losses_ipw))
 
                 loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data(model, train_loader, cuda=args.cuda)
                 loss_val, T_val, PS_logits_val, Y_val, X_val = transfer_data(model, val_loader, cuda=args.cuda)
@@ -737,6 +736,10 @@ if __name__ == "__main__":
 
                 results.append(
                     (i_iter, i, epoch, hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
+
+                print('HyperPara-i: {}, Epoch: {}, train loss: {}, balance: {}, auc: {}'.format(
+                    i, epoch, epoch_losses_ipw, result_trainval[5], result_val[1])
+                )
 
                 if (result_trainval[5] < best_balance) or \
                         ((result_trainval[5] == best_balance) and (result_val[1] > best_auc)):
