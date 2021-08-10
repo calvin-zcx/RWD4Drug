@@ -638,7 +638,7 @@ if __name__ == "__main__":
             'hidden_size': [32, 64, 128],
             'lr': [1e-3],
             'weight_decay': [1e-5],
-            'batch_size': [32],
+            'batch_size': [64],
             'dropout': [0.5],
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
