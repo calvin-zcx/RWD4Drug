@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     parser.add_argument('--stats', action='store_true')
     # Deep PSModels
-    parser.add_argument('--batch_size', type=int, default=1024)  # 64)
+    parser.add_argument('--batch_size', type=int, default=512)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-6)  # )0001)
     parser.add_argument('--epochs', type=int, default=15)  # 30
