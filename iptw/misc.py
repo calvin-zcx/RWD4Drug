@@ -814,7 +814,7 @@ if __name__ == '__main__':
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
     # split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
     shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
-                 more_para='--epochs 10 --batch_size 256')
+                 more_para='--epochs 10 --batch_size 128')
     split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
     model = 'LIGHTGBM'   # 'LR' #'LIGHTGBM'  #'LR'
