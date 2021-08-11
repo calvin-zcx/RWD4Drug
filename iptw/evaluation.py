@@ -17,6 +17,51 @@ import os
 SMD_THRESHOLD = 0.1
 
 
+def transfer_data_lstm(model, dataloader, cuda=True):
+    with torch.no_grad():
+        model.eval()
+        loss_treatment = []
+        logits_treatment = []
+        labels_treatment = []
+        labels_outcome = []
+        original_val = []
+        for confounder, treatment, outcome in dataloader:
+            if cuda:
+                for i in range(len(confounder)):
+                    confounder[i] = confounder[i].to('cuda')
+                treatment = treatment.to('cuda')
+                # outcome = outcome.to('cuda')
+
+            treatment_logits, original = model(confounder)
+            loss_t = F.binary_cross_entropy_with_logits(treatment_logits, treatment.float())
+
+            if cuda:
+                logits_t = treatment_logits.to('cpu').detach().data.numpy()
+                labels_t = treatment.to('cpu').detach().data.numpy()
+                original = original.to('cpu').detach().data.numpy()
+                #labels_o = outcome.to('cpu').detach().data.numpy()
+            else:
+                logits_t = treatment_logits.detach().data.numpy()
+                labels_t = treatment.detach().data.numpy()
+                original = original.detach().data.numpy()
+
+            labels_o = outcome.detach().data.numpy()
+
+            logits_treatment.append(logits_t)
+            labels_treatment.append(labels_t)
+            labels_outcome.append(labels_o)
+            loss_treatment.append(loss_t.item())
+            original_val.extend(original)
+
+        loss_treatment = np.mean(loss_treatment)
+
+        golds_treatment = np.concatenate(labels_treatment)
+        golds_outcome = np.concatenate(labels_outcome)
+        logits_treatment = np.concatenate(logits_treatment)
+
+        return loss_treatment, golds_treatment, logits_treatment, golds_outcome, original_val
+
+
 def transfer_data(model, dataloader, cuda=True):
     with torch.no_grad():
         model.eval()
@@ -159,16 +204,19 @@ def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1
     return IPTW_ALL, AUC_ALL, SMD_ALL, ATE_ALL, KM_ALL
 
 
-def model_eval_deep(model, dataloader, verbose=1, normalized=False, cuda=True, figsave='', report=5):
+def model_eval_deep(model, dataloader, verbose=1, normalized=False, cuda=True, figsave='', report=5, lstm=False):
     """  PSModels evaluation for deep PS PSModels """
     # loss_treatment, golds_treatment, logits_treatment, golds_outcome, original_val
-    loss, T, PS_logits, Y, X = transfer_data(model, dataloader, cuda=cuda)
+    if lstm:
+        loss, T, PS_logits, Y, X = transfer_data_lstm(model, dataloader, cuda=cuda)
+    else:
+        loss, T, PS_logits, Y, X = transfer_data(model, dataloader, cuda=cuda)
     return model_eval_common(X, T, Y, PS_logits, loss=loss, normalized=normalized,
                              verbose=verbose, figsave=figsave, report=report)
 
 
 def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, data_loader,
-                    drug_name, feature_name, n_feature, dump_ori=True):
+                    drug_name, feature_name, n_feature, dump_ori=True, lstm=False):
     mymodel = load_model(model_class, args.save_model_filename)
     mymodel.to(args.device)
 
@@ -176,19 +224,19 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
     print("*****" * 5, 'Evaluation on Train data:')
     train_IPTW_ALL, train_AUC_ALL, train_SMD_ALL, train_ATE_ALL, train_KM_ALL = model_eval_deep(
         mymodel, train_loader, verbose=1, normalized=False, cuda=args.cuda,
-        figsave=args.save_model_filename + '_train')
+        figsave=args.save_model_filename + '_train', lstm=lstm)
     print("*****" * 5, 'Evaluation on Validation data:')
     val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL = model_eval_deep(
         mymodel, val_loader, verbose=1, normalized=False, cuda=args.cuda,
-        figsave=args.save_model_filename + '_val')
+        figsave=args.save_model_filename + '_val', lstm=lstm)
     print("*****" * 5, 'Evaluation on Test data:')
     test_IPTW_ALL, test_AUC_ALL, test_SMD_ALL, test_ATE_ALL, test_KM_ALL = model_eval_deep(
         mymodel, test_loader, verbose=1, normalized=False, cuda=args.cuda,
-        figsave=args.save_model_filename + '_test')
+        figsave=args.save_model_filename + '_test', lstm=lstm)
     print("*****" * 5, 'Evaluation on ALL data:')
     IPTW_ALL, AUC_ALL, SMD_ALL, ATE_ALL, KM_ALL = model_eval_deep(
         mymodel, data_loader, verbose=1, normalized=False, cuda=args.cuda,
-        figsave=args.save_model_filename + '_all')
+        figsave=args.save_model_filename + '_all', lstm=lstm)
 
     results_train_val_test_all = []
     results_all_list = [

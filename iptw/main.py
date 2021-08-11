@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     parser.add_argument('--stats', action='store_true')
     # Deep PSModels
-    parser.add_argument('--batch_size', type=int, default=768)  # 64)
+    parser.add_argument('--batch_size', type=int, default=256)  #768)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-6)  # )0001)
     parser.add_argument('--epochs', type=int, default=15)  # 30
@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument('--med_emb_size', type=int, default=128)
     parser.add_argument('--med_hidden_size', type=int, default=64)
     parser.add_argument('--diag_hidden_size', type=int, default=64)
+    parser.add_argument('--lstm_hidden_size', type=int, default=100)
     # MLP
     parser.add_argument('--hidden_size', type=str, default='', help=', delimited integers')
     # Output
@@ -109,6 +110,20 @@ def flatten_data(mdata, data_indices, verbose=1):
               (x[:, d1:d1 + d2].mean(0) == 0).sum())
         print('...all:', x.shape, 'non-zero ratio:', (x != 0).mean(), 'all-zero:', (x.mean(0) == 0).sum())
     return x, t, y
+
+
+def _evaluation_helper(X, T, PS_logits, loss):
+    y_pred_prob = logits_to_probability(PS_logits, normalized=False)
+    auc = roc_auc_score(T, y_pred_prob)
+    max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, PS_logits, normalized=False, verbose=False)
+    n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
+    n_unbalanced_feature_weighted = len(np.where(smd_w > SMD_THRESHOLD)[0])
+    result = (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
+    return result
+
+
+def _loss_helper(v_loss, v_weights):
+    return np.dot(v_loss, v_weights) / np.sum(v_weights)
 
 
 # def main(args):
@@ -367,183 +382,155 @@ if __name__ == "__main__":
         print("**************************************************")
         print("**************************************************")
         print('LSTM-Attention PS PSModels learning:')
-        model_params = dict(
-            med_hidden_size=args.med_hidden_size,  # 64
-            diag_hidden_size=args.diag_hidden_size,  # 64
-            hidden_size=args.hidden_size,  # 100,
-            bidirectional=True,
-            med_vocab_size=len(my_dataset.med_code_vocab),
-            diag_vocab_size=len(my_dataset.diag_code_vocab),
-            diag_embedding_size=args.diag_emb_size,  # 128
-            med_embedding_size=args.med_emb_size,  # 128
-            end_index=my_dataset.diag_code_vocab[CodeVocab.END_CODE],
-            pad_index=my_dataset.diag_code_vocab[CodeVocab.PAD_CODE],
-        )
-        print(model_params)
+        paras_grid = {
+            'hidden_size': [32, 64, 100, 128], #100
+            'lr': [1e-3],
+            'weight_decay': [1e-6],
+            'batch_size': [32, 50, 64, 128],  #50
+        }
+        hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
+        hyper_paras_list = list(itertools.product(*hyper_paras_v))
+        print('Model {} Searching Space N={}: '.format(args.run_model, len(hyper_paras_list)), paras_grid)
 
-        model = lstm.LSTMModel(**model_params)
+        best_hyper_paras = None
+        best_model = None
+        best_auc = float('-inf')
+        best_balance = float('inf')
+        global_best_auc = float('-inf')
+        global_best_balance = float('inf')
+        best_model_epoch = -1
+        results = []
+        i = -1
+        i_iter = -1
+        for hyper_paras in tqdm(hyper_paras_list):
+            i += 1
+            hidden_size, lr, weight_decay, batch_size = hyper_paras
+            print('In hyper-paras space [{}/{}]...'.format(i, len(hyper_paras_list)))
+            print(hyper_paras_names)
+            print(hyper_paras)
 
-        if args.cuda:
-            model = model.to('cuda')
+            train_loader_shuffled = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                                sampler=train_sampler)
+            print('len(train_loader_shuffled): ', len(train_loader_shuffled),
+                  'train_loader_shuffled.batch_size: ', train_loader_shuffled.batch_size)
 
-        print(model)
+            model_params = dict(
+                med_hidden_size=args.med_hidden_size,  # 64
+                diag_hidden_size=args.diag_hidden_size,  # 64
+                hidden_size=hidden_size,  # 100,
+                bidirectional=True,
+                med_vocab_size=len(my_dataset.med_code_vocab),
+                diag_vocab_size=len(my_dataset.diag_code_vocab),
+                diag_embedding_size=args.diag_emb_size,  # 128
+                med_embedding_size=args.med_emb_size,  # 128
+                # end_index=my_dataset.diag_code_vocab[CodeVocab.END_CODE],
+                # pad_index=my_dataset.diag_code_vocab[CodeVocab.PAD_CODE],
+            )
+            print('Model: LSTM')
+            print(model_params)
+            model = lstm.LSTMModel(**model_params)
+            if args.cuda:
+                model = model.to('cuda')
+            print(model)
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
-        # highest_auc = 0
-        lowest_std = float('inf')
-        # lowest_n_unbalanced = float('inf')
-        model_selection_evaluation = []
-        for epoch in range(args.epochs):
-            epoch_losses_ipw = []
-            for confounder, treatment, outcome, col_name in tqdm(train_loader):
-                model.train()
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
-                # train IPW
-                optimizer.zero_grad()
+            for epoch in tqdm(range(args.epochs)):
+                i_iter += 1
+                epoch_losses_ipw = []
+                for confounder, treatment, outcome in train_loader_shuffled:
+                    model.train()
+                    # train IPW
+                    optimizer.zero_grad()
 
-                if args.cuda:  # confounder = (diag, med, sex, age)
-                    # confounder[0] = confounder[0].to('cuda')
-                    # confounder[1] = confounder[1].to('cuda')
-                    # confounder[2] = confounder[2].to('cuda')
-                    # confounder[3] = confounder[3].to('cuda')
-                    for i in range(len(confounder)):
-                        confounder[i] = confounder[i].to('cuda')
-                    treatment = treatment.to('cuda')
+                    if args.cuda:  # confounder = (diag, med, sex, age)
+                        for ii in range(len(confounder)):
+                            confounder[ii] = confounder[ii].to('cuda')
+                        treatment = treatment.to('cuda')
 
-                treatment_logits, _ = model(confounder)
-                loss_ipw = F.binary_cross_entropy_with_logits(treatment_logits, treatment.float())
+                    treatment_logits, _ = model(confounder)
+                    loss_ipw = F.binary_cross_entropy_with_logits(treatment_logits, treatment.float())
 
-                loss_ipw.backward()
-                optimizer.step()
-                epoch_losses_ipw.append(loss_ipw.item())
+                    loss_ipw.backward()
+                    optimizer.step()
+                    epoch_losses_ipw.append(loss_ipw.item())
 
-            epoch_losses_ipw = np.mean(epoch_losses_ipw)
+                # just finish 1 epoch
+                # scheduler.step()
+                epoch_losses_ipw = np.mean(epoch_losses_ipw)
 
-            print('Epoch: {}, IPW train loss: {}'.format(epoch, epoch_losses_ipw))
+                loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data_lstm(model, train_loader, cuda=args.cuda)
+                loss_val, T_val, PS_logits_val, Y_val, X_val = transfer_data_lstm(model, val_loader, cuda=args.cuda)
+                loss_test, T_test, PS_logits_test, Y_test, X_test = transfer_data_lstm(model, test_loader, cuda=args.cuda)
 
-            loss_val, AUC_val, max_unbalanced, ATE, AUC_val_iptw, AUC_val_expected = model_eval(model, val_loader,
-                                                                                                cuda=args.cuda)
-            _, hidden_deviation, max_unbalanced_weighted, hidden_deviation_w = max_unbalanced
+                result_train = _evaluation_helper(X_train, T_train, PS_logits_train, loss_train)
+                result_val = _evaluation_helper(X_val, T_val, PS_logits_val, loss_val)
+                result_test = _evaluation_helper(X_test, T_test, PS_logits_test, loss_test)
 
-            model_selection_evaluation.append(
-                [epoch, loss_val, AUC_val, AUC_val_iptw, AUC_val_expected, max_unbalanced_weighted])
+                n_train = len(X_train)
+                n_val = len(X_val)
+                n_test = len(X_test)
 
-            print('Val loss_treament: {}, AUC_treatment: {}, '
-                  'AUC_treatment_IPTW: {}, AUC_val_expected:{}. '
-                  'Max_unbalanced: {}'.format(loss_val, AUC_val, AUC_val_iptw, AUC_val_expected,
-                                              max_unbalanced_weighted))
-            print('ATE_w: {}'.format(ATE[1][2]))
-            if max_unbalanced_weighted < lowest_std:
-                print('save PSModels, max_unbalanced_weighted: ', max_unbalanced_weighted, 'lowest_std:', lowest_std)
-                save_model(model, args.save_model_filename, model_params=model_params)
-                lowest_std = max_unbalanced_weighted
+                result_trainval = _evaluation_helper(
+                    np.concatenate((X_train, X_val)),
+                    np.concatenate((T_train, T_val)),
+                    np.concatenate((PS_logits_train, PS_logits_val)),
+                    _loss_helper([loss_train, loss_val], [n_train, n_val])
+                )
 
-            if epoch % 5 == 0:
-                loss_test, AUC_test, _, _, AUC_test_iptw, AUC_test_expected = model_eval(model, test_loader,
-                                                                                         cuda=args.cuda)
-                print('Test loss_treament: {}'.format(loss_test))
-                print('Test AUC_treatment: {}'.format(AUC_test))
-                print('Test AUC_treatment_iptw: {}'.format(AUC_test_iptw))
-                print('Test AUC_test_expected: {}'.format(AUC_test_expected))
+                result_all = _evaluation_helper(
+                    np.concatenate((X_train, X_val, X_test)),
+                    np.concatenate((T_train, T_val, T_test)),
+                    np.concatenate((PS_logits_train, PS_logits_val, PS_logits_test)),
+                    _loss_helper([loss_train, loss_val, loss_test], [n_train, n_val, n_test])
+                )
 
-        model_selection_evaluation_pd = pd.DataFrame(model_selection_evaluation,
-                                                     columns=['epoch', 'loss_val', 'AUC_val', 'AUC_val_iptw',
-                                                              'AUC_val_expected', 'max_unbalanced_weighted'])
-        model_selection_evaluation_pd['expected-ori'] = (
-                model_selection_evaluation_pd['AUC_val_expected'] - model_selection_evaluation_pd['AUC_val']).abs()
-        model_selection_evaluation_pd.to_csv(args.save_model_filename + '_model_selection_on_validata.csv')
+                results.append(
+                    (i_iter, i, epoch,
+                     hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
 
-        mymodel = load_model(lstm.LSTMModel, args.save_model_filename)
-        mymodel.to(args.device)
+                print('HP-i:{}, epoch:{}, loss:{}\n'
+                      'trainval-balance:{}, all-balance:{}, val-auc:{}, test-auc:{}'.format(
+                    i, epoch, epoch_losses_ipw, result_trainval[5], result_all[5], result_val[1], result_test[1])
+                )
 
-        # test data
-        results_test_vs_all = []
-        loss_test, AUC_test, max_unbalanced_test, ATE_test, AUC_test_iptw, AUC_test_expected = model_eval(mymodel,
-                                                                                                          test_loader,
-                                                                                                          cuda=args.cuda)
-        max_unbalanced_original_test, hidden_deviation_test, max_unbalanced_weighted_test, hidden_deviation_w_test = max_unbalanced_test
+                if (result_trainval[5] < best_balance) or \
+                        ((result_trainval[5] == best_balance) and (result_val[1] > best_auc)):
+                    best_model = model
+                    best_hyper_paras = hyper_paras
+                    best_auc = result_val[1]
+                    best_balance = result_trainval[5]
+                    best_model_epoch = epoch
+                    print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
+                          'Epoch: ', epoch, 'trainval-balance:', best_balance, 'val-auc:', best_auc,
+                          "all-balance", result_all[5], "test-auc", result_test[1])
+                    print(hyper_paras_names)
+                    print(hyper_paras)
+                    save_model(model, args.save_model_filename, model_params=model_params)
 
-        n_unbalanced_feature_test = len(np.where(hidden_deviation_test > SMD_THRESHOLD)[0])
-        n_unbalanced_feature_w_test = len(np.where(hidden_deviation_w_test > SMD_THRESHOLD)[0])
-        # n_feature_test = my_dataset.med_vocab_length + my_dataset.diag_vocab_length + 2
+                if result_val[1] > global_best_auc:
+                    global_best_auc = result_val[1]
 
-        UncorrectedEstimator_EY1_test, UncorrectedEstimator_EY0_test, ATE_original_test = ATE_test[0]
-        IPWEstimator_EY1_test, IPWEstimator_EY0_test, ATE_weighted_test = ATE_test[1]
+                if result_trainval[5] <= global_best_balance:
+                    global_best_balance = result_trainval[5]
 
-        results_test_vs_all.append(
-            [loss_test, AUC_test, AUC_test_iptw, AUC_test_expected, np.abs(AUC_test_expected - AUC_test),
-             max_unbalanced_original_test, max_unbalanced_weighted_test,
-             n_unbalanced_feature_test, n_unbalanced_feature_w_test, n_feature])
-        print('Test loss_treament: {}'.format(loss_test))
-        print('Test AUC_treatment: {}'.format(AUC_test))
-        print('Test AUC_treatment_iptw: {}'.format(AUC_test_iptw))
-        print('Test AUC_test_expected: {}'.format(AUC_test_expected))
-        print('Test max_unbalanced_ori: {}, max_unbalanced_wei: {}'.format(max_unbalanced_original_test,
-                                                                           max_unbalanced_weighted_test))
+        name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
+        col_name = ['i', 'ipara', 'epoch', 'paras'] + \
+                   [pre + x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
+        results = pd.DataFrame(results, columns=col_name)
 
-        print('Test ATE_ori: {}, ATE_wei: {}'.format(ATE_original_test, ATE_weighted_test))
-        print('Test n_unbalanced_feature: {}, n_unbalanced_feature_w: {}, total: {}'.
-              format(n_unbalanced_feature_test, n_unbalanced_feature_w_test, n_feature))
+        print('Model selection finished! Save Global Best PSModel at Hyper-iter [{}/{}], Epoch: {}'.format(
+            i, len(hyper_paras_list), best_model_epoch), 'trainval-balance:', best_balance, 'val-auc:', best_auc,
+            'global_best_balance:', global_best_balance, 'global_best_auc:', global_best_auc)
 
-        # all data evaluation
-        loss_all, AUC, max_unbalanced, ATE, AUC_iptw, AUC_expected = model_eval(mymodel, data_loader, cuda=args.cuda)
-        max_unbalanced_original, hidden_deviation, max_unbalanced_weighted, hidden_deviation_w = max_unbalanced
+        print(hyper_paras_names)
+        print(best_hyper_paras)
 
-        n_unbalanced_feature = len(np.where(hidden_deviation > SMD_THRESHOLD)[0])
-        n_unbalanced_feature_w = len(np.where(hidden_deviation_w > SMD_THRESHOLD)[0])
-        # n_feature = my_dataset.med_vocab_length + my_dataset.diag_vocab_length + 2
-
-        UncorrectedEstimator_EY1, UncorrectedEstimator_EY0, ATE_original = ATE[0]
-        IPWEstimator_EY1, IPWEstimator_EY0, ATE_weighted = ATE[1]
-
-        results_test_vs_all.append(
-            [loss_all, AUC, AUC_iptw, AUC_expected, np.abs(AUC_expected - AUC),
-             max_unbalanced_original, max_unbalanced_weighted,
-             n_unbalanced_feature, n_unbalanced_feature_w, n_feature])
-
-        print('loss_treament: {}'.format(loss_all))
-        print('AUC_treatment: {}'.format(AUC))
-        print('AUC_treatment_IPTW: {}'.format(AUC_iptw))
-        print('AUC_treatment_expected: {}'.format(AUC_expected))
-        print('max_unbalanced_ori: {}, max_unbalanced_wei: {}'.format(max_unbalanced_original, max_unbalanced_weighted))
-
-        print('ATE_ori: {}, ATE_wei: {}'.format(ATE_original, ATE_weighted))
-        print(
-            'n_unbalanced_feature: {}, n_unbalanced_feature_w: {}'.format(n_unbalanced_feature, n_unbalanced_feature_w))
-
-        results_test_vs_all_pd = pd.DataFrame(results_test_vs_all,
-                                              columns=['loss_all', 'AUC', 'AUC_iptw', 'AUC_expected',
-                                                       'abs(AUC_expected - AUC)',
-                                                       'max_unbalanced_original', 'max_unbalanced_weighted',
-                                                       'n_unbalanced_feature', 'n_unbalanced_feature_w', 'n_feature'])
-        results_test_vs_all_pd.to_csv(args.save_model_filename + '_results_test_vs_all_pd.csv')
-
-        check_and_mkdir(args.outputs_lstm)
-        output_lstm = open(args.outputs_lstm, 'a')  # 'a'
-
-        output_lstm.write(
-            'drug,n_user,n_nonuser,max_unbalanced_original,max_unbalanced_weighted,'
-            'n_unbalanced_feature,n_unbalanced_feature_w,n_feature,'
-            'UncorrectedEstimator_EY1,UncorrectedEstimator_EY0,'
-            'ATE_original,IPWEstimator_EY1,IPWEstimator_EY0,'
-            'ATE_weighted\n')
-        output_lstm.write(
-            '{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(args.treated_drug, n_user, n_nonuser,
-                                                                 max_unbalanced_original, max_unbalanced_weighted,
-                                                                 n_unbalanced_feature, n_unbalanced_feature_w,
-                                                                 n_feature,
-                                                                 UncorrectedEstimator_EY1,
-                                                                 UncorrectedEstimator_EY0,
-                                                                 ATE_original, IPWEstimator_EY1,
-                                                                 IPWEstimator_EY0,
-                                                                 ATE_weighted))
-        print(n_user, n_nonuser, max_unbalanced_original,
-              max_unbalanced_weighted, n_unbalanced_feature,
-              n_unbalanced_feature_w, n_feature,
-              UncorrectedEstimator_EY1, UncorrectedEstimator_EY0,
-              ATE_original, IPWEstimator_EY1,
-              IPWEstimator_EY0, ATE_weighted)
-        output_lstm.close()
+        results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
+        results_all_list, results_all_df = final_eval_deep(lstm.LSTMModel, args, train_loader, val_loader, test_loader,
+                                                           data_loader,
+                                                           drug_name, feature_name, n_feature,
+                                                           dump_ori=False, lstm=True)
 
     # %% Logistic regression PS PSModels
     if args.run_model in ['LR', 'XGBOOST', 'LIGHTGBM']:
@@ -608,25 +595,6 @@ if __name__ == "__main__":
         print(args.run_model, ' PS model learning:')
 
         # PSModels configuration & training
-        # paras_grid = {
-        #     'hidden_size': [128],
-        #     'lr': [1e-3],
-        #     'weight_decay': [1e-6],
-        #     'batch_size': [32],
-        #     'dropout': [0.5],
-        # }
-        def _evaluation_helper(X, T, PS_logits, loss):
-            y_pred_prob = logits_to_probability(PS_logits, normalized=False)
-            auc = roc_auc_score(T, y_pred_prob)
-            max_smd, smd, max_smd_weighted, smd_w = cal_deviation(X, T, PS_logits, normalized=False, verbose=False)
-            n_unbalanced_feature = len(np.where(smd > SMD_THRESHOLD)[0])
-            n_unbalanced_feature_weighted = len(np.where(smd_w > SMD_THRESHOLD)[0])
-            result = (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
-            return result
-
-        def _loss_helper(v_loss, v_weights):
-            return np.dot(v_loss, v_weights) / np.sum(v_weights)
-
         # paras_grid = {
         #     'hidden_size': [0, 32, 64, 128],
         #     'lr': [1e-2, 1e-3, 1e-4],
@@ -781,6 +749,7 @@ if __name__ == "__main__":
                                                            drug_name, feature_name, n_feature, dump_ori=False)
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+
 
 # if __name__ == "__main__":
 #     start_time = time.time()
