@@ -117,7 +117,7 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
     return p_final, orig
 
 
-def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True):
+def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
@@ -149,10 +149,10 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True)
                 for seed in range(0, niter):
                     cmd = "python main.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
                           "--controlled_drug {} --run_model {} --output_dir output/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
                           "2>&1 | tee output/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
-                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '',
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
                     fo.write(cmd)
                     n += 1
@@ -809,24 +809,28 @@ if __name__ == '__main__':
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
-    model = 'LIGHTGBM'  #'LR' #'LIGHTGBM'  #'LR' #'LR'  #
-    # # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
+    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
+    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
+    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
+    # split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
+    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
+                 more_para='--epochs 10 --batch_size 256')
+    split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
+
+    model = 'LIGHTGBM'   # 'LR' #'LIGHTGBM'  #'LR'
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
     # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
     # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
     # results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
     #
-    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
+    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
+    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+    #
+    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
+    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
+    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
 
-    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
 
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
-    # split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
     print('Done')

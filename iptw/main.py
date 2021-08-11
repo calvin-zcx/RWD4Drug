@@ -380,11 +380,17 @@ if __name__ == "__main__":
         print("**************************************************")
         print("**************************************************")
         print('LSTM-Attention PS PSModels learning:')
+        # paras_grid = {
+        #     'hidden_size': [32, 64, 100, 128], #100
+        #     'lr': [1e-3],
+        #     'weight_decay': [1e-6],
+        #     'batch_size': [32, 50, 64, 128],  #50
+        # }
         paras_grid = {
-            'hidden_size': [32, 64, 100, 128], #100
+            'hidden_size': [32, 64, 100, 128],  # 100
             'lr': [1e-3],
             'weight_decay': [1e-6],
-            'batch_size': [32, 50, 64, 128],  #50
+            'batch_size': [50],  # 50
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
         hyper_paras_list = list(itertools.product(*hyper_paras_v))
