@@ -813,23 +813,23 @@ if __name__ == '__main__':
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
     # split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
-    shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
-                 more_para='--epochs 10 --batch_size 128')
-    split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
+    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
+    #              more_para='--epochs 10 --batch_size 128')
+    # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
-    model = 'LIGHTGBM'   # 'LR' #'LIGHTGBM'  #'LR'
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    #
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-    #
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+    model = 'MLP'   # 'LR' #'LIGHTGBM'  #'LR'
+    results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
+    results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
+    results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
+
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+
+    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
+    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
+    box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
 
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
 
