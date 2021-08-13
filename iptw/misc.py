@@ -20,14 +20,15 @@ import re
 import itertools
 import functools
 import random
+import seaborn as sns
 
 print = functools.partial(print, flush=True)
 
 MAX_NO_UNBALANCED_FEATURE = 5
 
-
 np.random.seed(0)
 random.seed(0)
+
 
 def IQR(s):
     return [np.quantile(s, .5), np.quantile(s, .25), np.quantile(s, .75)]
@@ -99,7 +100,8 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
     orig = stats.ttest_ind(x, y, equal_var=equal_var)
     pooled_mean = np.concatenate((x, y), axis=None).mean()
 
-    xboot = boot_matrix(x - x.mean() + pooled_mean, B=B)  # important centering step to get sampling distribution under the null
+    xboot = boot_matrix(x - x.mean() + pooled_mean,
+                        B=B)  # important centering step to get sampling distribution under the null
     yboot = boot_matrix(y - y.mean() + pooled_mean, B=B)
     sampling_distribution = stats.ttest_ind(xboot, yboot, axis=1, equal_var=equal_var)[0]
 
@@ -165,13 +167,13 @@ def split_shell_file(fname, divide=2, skip_first=1):
     f = open(fname, 'r')
     content_list = f.readlines()
     n = len(content_list)
-    n_d = np.ceil((n-skip_first)/divide)
-    seg = [0, ] + [int(i*n_d + skip_first) for i in range(1, divide)] +[n]
+    n_d = np.ceil((n - skip_first) / divide)
+    seg = [0, ] + [int(i * n_d + skip_first) for i in range(1, divide)] + [n]
     for i in range(divide):
         fout_name = fname.split('.')
-        fout_name = ''.join(fout_name[:-1]) + '-' + str(i) + '.'+fout_name[-1]
+        fout_name = ''.join(fout_name[:-1]) + '-' + str(i) + '.' + fout_name[-1]
         fout = open(fout_name, 'w')
-        for l in content_list[seg[i]:seg[i+1]]:
+        for l in content_list[seg[i]:seg[i + 1]]:
             fout.write(l)
         fout.close()
     print('dump done')
@@ -365,10 +367,12 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
             y2 = np.array(rdf.loc[idx, "val_maxsmd_nsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
             p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
             p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
-            r.extend([p1, test_orig1[1], p2, test_orig2[1]])
+            p3, test_orig3 = bootstrap_mean_pvalue_2samples(y1, y2)
+            r.extend([p1, test_orig1[1], p2, test_orig2[1], p3, test_orig3[1]])
             col_name.extend(
                 ['pboot-succes-final-vs-auc', 'p-succes-final-vs-auc',
-                 'pboot-succes-final-vs-maxsmd', 'p-succes-final-vs-maxsmd'])
+                 'pboot-succes-final-vs-maxsmd', 'p-succes-final-vs-maxsmd',
+                 'pboot-succes-auc-vs-maxsmd', 'p-succes-auc-vs-maxsmd'])
 
             results.append(r)
         df = pd.DataFrame(results, columns=col_name)
@@ -553,7 +557,7 @@ def check_drug_name_code():
     return df
 
 
-def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True):
+def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
     dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
     idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
@@ -568,20 +572,24 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     # df['nsmd_mean_ci-val_auc_nsmd']
 
     N = len(df)
-    top_1 = df.loc[:, 'success_rate-val_auc_nsmd'] #* 100
-    top_1_ci = np.array(df.loc[:, 'success_rate_ci-val_auc_nsmd'].apply(lambda x:stringlist_2_list(x)).to_list()) #*100
+    top_1 = df.loc[:, 'success_rate-val_auc_nsmd']  # * 100
+    top_1_ci = np.array(
+        df.loc[:, 'success_rate_ci-val_auc_nsmd'].apply(lambda x: stringlist_2_list(x)).to_list())  # *100
     # top_1_ci = df.loc[:, 'success_rate_std-val_auc_nsmd']
 
-    top_2 = df.loc[:, 'success_rate-val_maxsmd_nsmd'] #* 100
-    top_2_ci = np.array(df.loc[:, 'success_rate_ci-val_maxsmd_nsmd'].apply(lambda x:stringlist_2_list(x)).to_list()) #*100
+    top_2 = df.loc[:, 'success_rate-val_maxsmd_nsmd']  # * 100
+    top_2_ci = np.array(
+        df.loc[:, 'success_rate_ci-val_maxsmd_nsmd'].apply(lambda x: stringlist_2_list(x)).to_list())  # *100
     # top_2_ci = df.loc[:, 'success_rate_std-val_maxsmd_nsmd']
 
-    top_3 = df.loc[:, 'success_rate-trainval_final_finalnsmd'] #* 100
-    top_3_ci = np.array(df.loc[:, 'success_rate_ci-trainval_final_finalnsmd'].apply(lambda x:stringlist_2_list(x)).to_list()) #*100
+    top_3 = df.loc[:, 'success_rate-trainval_final_finalnsmd']  # * 100
+    top_3_ci = np.array(
+        df.loc[:, 'success_rate_ci-trainval_final_finalnsmd'].apply(lambda x: stringlist_2_list(x)).to_list())  # *100
     # top_3_ci = df.loc[:, 'success_rate_std-trainval_final_finalnsmd']
 
     pauc = np.array(df.loc[:, "p-succes-final-vs-auc"])
     psmd = np.array(df.loc[:, "p-succes-final-vs-maxsmd"])
+    paucsmd = np.array(df.loc[:, "p-succes-auc-vs-maxsmd"])
 
     xlabels = df.loc[:, 'drug_name']
 
@@ -592,9 +600,12 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     fig, ax = plt.subplots(figsize=(18, 8))
     error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
     # plt.ylim([0, 1.05])
-    rects1 = ax.bar(ind, top_1, width, yerr=[top_1-top_1_ci[:,0], top_1_ci[:,1]-top_1], error_kw=error_kw, color=colors[0], edgecolor="black")  #, edgecolor='b'
-    rects2 = ax.bar(ind + width, top_2, width, yerr=[top_2-top_2_ci[:,0], top_2_ci[:,1]-top_2], error_kw=error_kw, color=colors[1], edgecolor="black")
-    rects3 = ax.bar(ind + 2 * width, top_3, width, yerr=[top_3-top_3_ci[:,0], top_3_ci[:,1]-top_3], error_kw=error_kw, color=colors[2], edgecolor="black") #, hatch='.')
+    rects1 = ax.bar(ind, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1], error_kw=error_kw,
+                    color=colors[0], edgecolor="black")  # , edgecolor='b'
+    rects2 = ax.bar(ind + width, top_2, width, yerr=[top_2 - top_2_ci[:, 0], top_2_ci[:, 1] - top_2], error_kw=error_kw,
+                    color=colors[1], edgecolor="black")
+    rects3 = ax.bar(ind + 2 * width, top_3, width, yerr=[top_3 - top_3_ci[:, 0], top_3_ci[:, 1] - top_3],
+                    error_kw=error_kw, color=colors[2], edgecolor="black")  # , hatch='.')
     # rects1 = ax.bar(ind, top_1, width, yerr=[top_1_ci, top_1_ci], error_kw=error_kw,
     #                 color='#FAC200', edgecolor="black")  # , edgecolor='b'
     # rects2 = ax.bar(ind + width, top_2, width, yerr=[top_2_ci, top_2_ci], error_kw=error_kw,
@@ -641,27 +652,39 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
 
     for i, rect in enumerate(rects3):
         d = 0.02
-        y = top_3_ci[i,1]*1.03  #rect.get_height()
+        y = top_3_ci[i, 1] * 1.03  # rect.get_height()
         w = rect.get_width()
-        x = rect.get_x() + 1*w
-        x1 = x - 3*w
-        x2 = x - 2*w
+        x = rect.get_x()
+        x1 = x - 2 * w
+        x2 = x - 1 * w
 
-        y1 = top_1_ci[i,1]*1.03
-        y2 = top_2_ci[i,1]*1.03
+        y1 = top_1_ci[i, 1] * 1.03
+        y2 = top_2_ci[i, 1] * 1.03
 
-        ax.plot([x1, x1, (x+x1)/2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.5, c=colors[0])
-        ax.plot([(x+x1)/2, x, x], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.5, c=colors[2])
+        # auc v.s. final
+        l, r = x1, x + w
+        ax.plot([l, l, (l+r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(l+r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
         # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-        ax.text(x - 1.5*w, y+2.6*d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
+        ax.text((l+r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
 
-        ax.plot([x2, x2, (x + x2) / 2], [y, y + d, y + d], lw=1.5, c=colors[1])
-        ax.plot([(x + x2) / 2, x, x], [y + d, y + d, y ], lw=1.5, c=colors[2])
+        # smd v.s. final
+        l, r = x2 + 0.6*w, x + w
+        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
+        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
         # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-        ax.text(x - w, y + 0.6*d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
+        ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
+
+        # auc v.s. smd
+        l, r = x1, x2 + 0.4*w
+        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
+        # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+        ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
 
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
-    ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Val-SMD Select', 'Our Strategy'), fontsize=25) #, bbox_to_anchor=(1.13, 1.01))
+    ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Val-SMD Select', 'Our Strategy'),
+              fontsize=25)  # , bbox_to_anchor=(1.13, 1.01))
 
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
@@ -673,10 +696,10 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     plt.clf()
 
 
-def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True):
+def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
     dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
-                          sheet_name=contrl_type, converters={'drug':str} )
+                          sheet_name=contrl_type, converters={'drug': str})
     idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
     idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
     idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
@@ -702,33 +725,51 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
             idx = rdf['ctrl_type'] == contrl_type
         else:
             idx = rdf['ctrl_type'].notna()
-        data_1.append((rdf.loc[idx, "val_auc_testauc"]))
-        data_2.append((rdf.loc[idx, "val_maxsmd_testauc"]))
-        data_3.append((rdf.loc[idx, "trainval_final_testnauc"]))
+        data_1.append(np.array(rdf.loc[idx, "val_auc_testauc"]))
+        data_2.append(np.array(rdf.loc[idx, "val_maxsmd_testauc"]))
+        data_3.append(np.array(rdf.loc[idx, "trainval_final_testnauc"]))
         p1, test_orig1 = bootstrap_mean_pvalue_2samples(data_3[-1], data_1[-1])
         p2, test_orig2 = bootstrap_mean_pvalue_2samples(data_3[-1], data_2[-1])
+        p3, test_orig3 = bootstrap_mean_pvalue_2samples(data_1[-1], data_2[-1])
         # test_orig1_man = stats.mannwhitneyu(data_3[-1], data_1[-1])
         # test_orig2_man = stats.mannwhitneyu(data_3[-1], data_2[-1])
-        data_pvalue.append([test_orig1[1], test_orig2[1]])
+        data_pvalue.append([test_orig1[1], test_orig2[1], test_orig3[1]])
 
+    colors = ['#FAC200', '#82A2D3', '#F65453']
     fig, ax = plt.subplots(figsize=(18, 8))
     width = 0.5  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
     sym = 'o'
-    box_kw = {"sym":sym, "widths":width, "patch_artist":True, "notch":True}
+    # 'meanline':True,
+    box_kw = {"sym": sym, "widths": width, "patch_artist": True, "notch": True,
+              'showmeans':True, #'meanline':True,
+              "meanprops": dict(linestyle='--', linewidth=1, markeredgecolor='purple', marker='^', markerfacecolor="None")}
     rects1 = plt.boxplot(data_1, positions=ind - 0.08, **box_kw)
     rects2 = plt.boxplot(data_2, positions=ind + width, **box_kw)
-    rects3 = plt.boxplot(data_3, positions=ind + 2*width + 0.08, **box_kw)
+    rects3 = plt.boxplot(data_3, positions=ind + 2 * width + 0.08, **box_kw)
 
-    ticks = list(drug_name_list)
-    colors = ['#FAC200', '#82A2D3', '#F65453']
+    def plot_strip(ind, data, color):
+        w = width - 0.1
+        swarm1 = pd.DataFrame([(ind[i], data[i][j]) for i in range(len(ind)) for j in range(len(data[i]))],
+                              columns=['x', 'y'])
+        strip_rx = stats.uniform(-w/ 2., w).rvs(len(swarm1))
+        # sns.stripplot(x='x', y='y', data=swarm1, color=".25", alpha=0.2, ax=ax)
+        plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=0.2, c=color)
+
+    # ticks = list(drug_name_list)
     for i, bplot in enumerate([rects1, rects2, rects3]):
         for patch in bplot['boxes']:
             patch.set_facecolor(colors[i])
+            r, g, b, a = patch.get_facecolor()
+            patch.set_facecolor((r, g, b, .7))
         # plt.setp(bplot['boxes'], color=color)
         # plt.setp(bplot['whiskers'], color=color)
         # plt.setp(bplot['caps'], color=color)
         plt.setp(bplot['medians'], color='black')
+
+    plot_strip(ind - 0.08, data_1, colors[0])
+    plot_strip(ind + width, data_2, colors[1])
+    plot_strip(ind + 2 * width + 0.08, data_3, colors[2])
 
     # plt.ylim([0.5, 0.85])
     ax.set_xticks(ind + width)
@@ -767,20 +808,28 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     p_v = np.array(data_pvalue)
     for i in range(N):
         d = 0.008
-        y = np.max([data_1[i].max(), data_2[i].max(), data_3[i].max()])*1.01  #rect.get_height()
-        x = ind[i] + 2*width + 0.08 #+ width/2
+        y = np.max([data_1[i].max(), data_2[i].max(), data_3[i].max()]) * 1.01  # rect.get_height()
+        x = ind[i] + 2 * width + 0.08  # + width/2
         x1 = ind[i] - 0.08  # - width/2
         x2 = ind[i] + width  # - width/2
 
-        ax.plot([x1, x1, (x+x1)/2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.5, c=colors[0])
-        ax.plot([(x+x1)/2, x, x], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.5, c=colors[2])
+        # auc v.s. smd
+        l, r = x - 0.5*width, x2 - 0.08
+        ax.plot([x1, x1, (x2 + x1) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(x2 + x1) / 2, x2 - 0.08, x2-0.08], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
+        ax.text((x2 + x1) / 2, y + d, significance(p_v[i, 2]), ha='center', va='bottom', fontsize=12)
+
+        # auc v.s. final
+        ax.plot([x1, x1, (x + x1) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(x + x1) / 2, x, x], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
         # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c="black")
-        ax.text((x+x1)/2, y+3*d, significance(p_v[i, 0]), ha='center', va='bottom', fontsize=12)
-        #
-        ax.plot([x2, x2, (x + x2) / 2], [y, y + d, y + d], lw=1.5, c=colors[1])
-        ax.plot([(x + x2) / 2, x, x], [y + d, y + d, y ], lw=1.5, c=colors[2])
+        ax.text((x + x1) / 2, y + 3 * d, significance(p_v[i, 0]), ha='center', va='bottom', fontsize=12)
+
+        # smd v.s. final
+        ax.plot([x2+0.08, x2+0.08, (x + x2) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
+        ax.plot([(x + x2) / 2, x, x], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
         # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c="black")
-        ax.text((x + x2) / 2, y + 1*d, significance(p_v[i, 1]), ha='center', va='bottom', fontsize=12)
+        ax.text((x + x2) / 2, y + 1 * d, significance(p_v[i, 1]), ha='center', va='bottom', fontsize=12)
 
     ax.legend((rects1["boxes"][0], rects2["boxes"][0], rects3["boxes"][0]),
               ('Val-AUC Select', 'Val-SMD Select', 'Our Strategy'),
@@ -817,20 +866,19 @@ if __name__ == '__main__':
     #              more_para='--epochs 10 --batch_size 128')
     # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
-    model = 'MLP'   # 'LR' #'LIGHTGBM'  #'LR'
+    model = 'LIGHTGBM'  # 'LR' #'LIGHTGBM'  #'LR'
     results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
     results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
     results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
     results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-
+    # # #
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-
+    # #
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
 
     # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
-
     print('Done')

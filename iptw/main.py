@@ -6,7 +6,7 @@ from dataset import *
 import pickle
 import argparse
 from torch.utils.data.sampler import SubsetRandomSampler
-from evaluation import * # model_eval_common, model_eval_deep, final_eval_deep, final_eval_ml, SMD_THRESHOLD,transfer_data
+from evaluation import *
 import torch.nn.functional as F
 import os
 from utils import save_model, load_model, check_and_mkdir
