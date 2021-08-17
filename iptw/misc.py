@@ -381,6 +381,81 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     print()
 
 
+def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+    drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
+    drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
+    check_and_mkdir(dirname + 'results/')
+
+    writer = pd.ExcelWriter(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model), engine='xlsxwriter')
+    for t in ['random', 'atc', 'all']:
+        results = []
+        for drug in drug_list:
+            rdf = pd.read_csv(dirname + 'results/' + drug + '_model_selection.csv')
+
+            if t != 'all':
+                idx = rdf['ctrl_type'] == t
+            else:
+                idx = rdf['ctrl_type'].notna()
+
+            r = [drug, drug_name.get(drug, '')]
+            col_name = ['drug', 'drug_name']
+            for c1, c2 in zip(
+                    ["val_auc_nsmd", "val_maxsmd_nsmd", "val_nsmd_nsmd", "train_maxsmd_nsmd",
+                     "train_nsmd_nsmd", "trainval_maxsmd_nsmd", "trainval_nsmd_nsmd", "trainval_final_finalnsmd"],
+                    ["val_auc_testauc", "val_maxsmd_testauc", "val_nsmd_testauc", "train_maxsmd_testauc",
+                     "train_nsmd_testauc", "trainval_maxsmd_testauc", "trainval_nsmd_testauc", 'trainval_final_testnauc']):
+            # for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "val_nsmd_nsmd", "train_maxsmd_nsmd", "train_nsmd_nsmd", "trainval_final_finalnsmd"],
+            #                   ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
+                nsmd = rdf.loc[idx, c1]
+                auc = rdf.loc[idx, c2]
+
+                nsmd_med = IQR(nsmd)[0]
+                nsmd_iqr = IQR(nsmd)[1:]
+
+                nsmd_mean = nsmd.mean()
+                nsmd_mean_ci, nsmd_mean_std = bootstrap_mean_ci(nsmd, alpha=0.05)
+
+                success_rate = (nsmd <= MAX_NO_UNBALANCED_FEATURE).mean()
+                success_rate_ci, success_rate_std = bootstrap_mean_ci(nsmd <= MAX_NO_UNBALANCED_FEATURE, alpha=0.05)
+
+                auc_med = IQR(auc)[0]
+                auc_iqr = IQR(auc)[1:]
+
+                auc_mean = auc.mean()
+                auc_mean_ci, auc_mean_std = bootstrap_mean_ci(auc, alpha=0.05)
+
+                r.extend([nsmd_med, nsmd_iqr,
+                          nsmd_mean, nsmd_mean_ci, nsmd_mean_std,
+                          success_rate, success_rate_ci, success_rate_std,
+                          auc_med, auc_iqr, auc_mean, auc_mean_ci, auc_mean_std])
+                col_name.extend(
+                    ["nsmd_med-" + c1, "nsmd_iqr-" + c1, "nsmd_mean-" + c1, "nsmd_mean_ci-" + c1, "nsmd_mean_std-" + c1,
+                     "success_rate-" + c1, "success_rate_ci-" + c1, "success_rate_std-" + c1,
+                     "auc_med-" + c2, "auc_iqr-" + c2, "auc_mean-" + c2, "auc_mean_ci-" + c2, "auc_mean_std-" + c2])
+
+            x = np.array(rdf.loc[idx, "trainval_final_finalnsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
+            y1 = np.array(rdf.loc[idx, "val_auc_nsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
+            y2 = np.array(rdf.loc[idx, "val_maxsmd_nsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
+            p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
+            p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
+            p3, test_orig3 = bootstrap_mean_pvalue_2samples(y1, y2)
+            r.extend([p1, test_orig1[1], p2, test_orig2[1], p3, test_orig3[1]])
+            col_name.extend(
+                ['pboot-succes-final-vs-auc', 'p-succes-final-vs-auc',
+                 'pboot-succes-final-vs-maxsmd', 'p-succes-final-vs-maxsmd',
+                 'pboot-succes-auc-vs-maxsmd', 'p-succes-auc-vs-maxsmd'])
+
+            results.append(r)
+        df = pd.DataFrame(results, columns=col_name)
+        df.to_excel(writer, sheet_name=t)
+    writer.save()
+    print()
+
+
 def results_ATE_for_ml(cohort_dir_name, model, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
@@ -749,7 +824,7 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     rects3 = plt.boxplot(data_3, positions=ind + 2 * width + 0.08, **box_kw)
 
     def plot_strip(ind, data, color):
-        w = width - 0.1
+        w = width - 0.15
         swarm1 = pd.DataFrame([(ind[i], data[i][j]) for i in range(len(ind)) for j in range(len(data[i]))],
                               columns=['x', 'y'])
         strip_rx = stats.uniform(-w/ 2., w).rvs(len(swarm1))
@@ -866,16 +941,17 @@ if __name__ == '__main__':
     #              more_para='--epochs 10 --batch_size 128')
     # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
-    model = 'LIGHTGBM'  # 'LR' #'LIGHTGBM'  #'LR'
+    model = 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'
     results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
     results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
+    results_model_selection_for_ml_step2More(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
     results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
     results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
     # # #
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-    # #
+    #
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
     box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
