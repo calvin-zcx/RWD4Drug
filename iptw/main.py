@@ -144,12 +144,14 @@ if __name__ == "__main__":
     # %% 1. Load Data
     ## load drug code name mapping
     if args.drug_coding.lower() == 'gpi':
-        with open(r'../ipreprocess/output/_gpi_ingredients_nameset_cnt.pkl', 'rb') as f:
+        _fname = os.path.join(args.data_dir, '../_gpi_ingredients_nameset_cnt.pkl')
+        print('drug_name file: ', _fname)
+        with open(_fname, 'rb') as f:
             # change later, move this file to pickles also
             gpiing_names_cnt = pickle.load(f)
             drug_name = {}
             for key, val in gpiing_names_cnt.items():
-                drug_name[key] = val[0]
+                drug_name[key] = '/'.join(val[0])
         print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
     else:
         with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:

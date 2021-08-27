@@ -163,6 +163,50 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
     print('In total ', n, ' commands')
 
 
+def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    fo = open('shell_{}_{}_marketscan.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+            added_drug.extend(gpi)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo.write('mkdir -p output_marketscan/{}/{}/log\n'.format(cohort_dir_name, model))
+    n = 0
+    for x in name_cnt:
+        k, v = x
+        if (v >= min_patients) or (k in added_drug):
+            drug = k.split('.')[0]
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main.py --data_dir ../ipreprocess/output_marketscan/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output_marketscan/{}/{}/ --random_seed {} " \
+                          "--drug_coding gpi --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output_marketscan/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n += 1
+
+    fo.close()
+    print('In total ', n, ' commands')
+
+
 def split_shell_file(fname, divide=2, skip_first=1):
     f = open(fname, 'r')
     content_list = f.readlines()
@@ -1244,6 +1288,9 @@ if __name__ == '__main__':
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
+    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
+    split_shell_file("shell_LR_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
+
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
@@ -1252,30 +1299,30 @@ if __name__ == '__main__':
     #              more_para='--epochs 10 --batch_size 128')
     # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
-    cohort_dir_name = 'save_cohort_all_loose'
-    model = 'LSTM'  #'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-
-    results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # major plots from 3 methods
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    ## all methods plots in appendix
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    # cohort_dir_name = 'save_cohort_all_loose'
+    # model = 'LSTM'  #'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    #
+    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # # major plots from 3 methods
+    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    #
+    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    #
+    # ## all methods plots in appendix
+    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    #
+    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
     print('Done')
