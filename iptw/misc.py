@@ -773,8 +773,9 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     ax.set_xmargin(0.01)
     plt.tight_layout()
     if dump:
-        fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}.pdf'.format(model, contrl_type))
+        check_and_mkdir(dirname + 'results/fig/')
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}.png'.format(model, contrl_type))
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -911,8 +912,9 @@ def bar_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dum
     ax.set_xmargin(0.01)
     plt.tight_layout()
     if dump:
-        fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}-all.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/balance_rate_barplot-{}-{}-all.pdf'.format(model, contrl_type))
+        check_and_mkdir(dirname + 'results/fig/')
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-all.png'.format(model, contrl_type))
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-all.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -1058,8 +1060,9 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     ax.set_xmargin(0.01)
     plt.tight_layout()
     if dump:
-        fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}.pdf'.format(model, contrl_type))
+        check_and_mkdir(dirname + 'results/fig/')
+        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}.png'.format(model, contrl_type))
+        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -1219,8 +1222,9 @@ def box_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dum
     ax.set_xmargin(0.01)
     plt.tight_layout()
     if dump:
-        fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}-all.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/test_auc_boxplot-{}-{}-all.pdf'.format(model, contrl_type))
+        check_and_mkdir(dirname + 'results/fig/')
+        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}-all.png'.format(model, contrl_type))
+        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}-all.pdf'.format(model, contrl_type))
     plt.show()
     plt.clf()
 
@@ -1248,22 +1252,30 @@ if __name__ == '__main__':
     #              more_para='--epochs 10 --batch_size 128')
     # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
+    cohort_dir_name = 'save_cohort_all_loose'
     model = 'LSTM'  #'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    # results_model_selection_for_ml_step2More(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    # results_ATE_for_ml(cohort_dir_name='save_cohort_all_loose', model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name='save_cohort_all_loose', model=model, drug_name=drug_name)
-    # # #
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-    # bar_plot_model_selectionV2(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-    #
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
-    box_plot_model_selectionV2(cohort_dir_name='save_cohort_all_loose', model=model, contrl_type='all')
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
-    # results_model_selection_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', drug_name=drug_name)
+    results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # major plots from 3 methods
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    ## all methods plots in appendix
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
     print('Done')
