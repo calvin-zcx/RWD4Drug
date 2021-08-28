@@ -1289,8 +1289,11 @@ if __name__ == '__main__':
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
     # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)  # too slow to get --stats
-    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
-    split_shell_file("shell_LR_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
+    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
+    # split_shell_file("shell_LR_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
+
+    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
+    split_shell_file("shell_LIGHTGBM_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
 
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)

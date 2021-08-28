@@ -208,19 +208,20 @@ if __name__ == "__main__":
         ATC2DRUG = pickle.load(open(os.path.join('pickles/', 'atcL2_rx.pkl'), 'rb'))  # ATC2DRUG.pkl
         DRUG2ATC = pickle.load(open(os.path.join('pickles/', 'rx_atcL2.pkl'), 'rb'))  # DRUG2ATC.pkl
 
-        # if args.stats:
-        ## atc drug statistics:
-        in_atc = np.array([x in DRUG2ATC for x in drug_in_dir])
-        print('Total drugs in dir: {}, {} ({:.2f}%) have atc mapping, {} ({:.2f}%) have not'.format(
-            in_atc.shape[0],
-            in_atc.sum(),
-            in_atc.mean() * 100,
-            in_atc.shape[0] - in_atc.sum(),
-            (1 - in_atc.mean()) * 100,
-        ))
-        print('{} rxnorm codes without atc in DRUG2ATC are:\n'.format(len(set(drug_in_dir) - set(DRUG2ATC.keys()))),
-              set(drug_in_dir) - set(DRUG2ATC.keys()))
-        ###
+        if args.drug_coding.lower() == 'rxnorm':
+            # if args.stats:
+            ## atc drug statistics:
+            in_atc = np.array([x in DRUG2ATC for x in drug_in_dir])
+            print('Total drugs in dir: {}, {} ({:.2f}%) have atc mapping, {} ({:.2f}%) have not'.format(
+                in_atc.shape[0],
+                in_atc.sum(),
+                in_atc.mean() * 100,
+                in_atc.shape[0] - in_atc.sum(),
+                (1 - in_atc.mean()) * 100,
+            ))
+            print('{} rxnorm codes without atc in DRUG2ATC are:\n'.format(len(set(drug_in_dir) - set(DRUG2ATC.keys()))),
+                  set(drug_in_dir) - set(DRUG2ATC.keys()))
+            ###
 
         atc_group = set()
         if args.drug_coding.lower() == 'gpi':
