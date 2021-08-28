@@ -309,7 +309,7 @@ if __name__ == "__main__":
         #           (outcome, outcome_t2e))
         print('Summarize statistics between treat v.s. control ...')
         from ipreprocess.univariate_statistics import build_patient_characteristics_from_triples, \
-            statistics_for_treated_control
+            statistics_for_treated_control, build_patient_characteristics_from_triples_v2
 
         with open('../ipreprocess/mapping/CCW_AD_comorbidity.json') as f:
             ccw_ad_comorbidity = json.load(f)
@@ -325,8 +325,10 @@ if __name__ == "__main__":
             is_antidiabetic = lambda x: x in atc2rxnorm['A10']
             is_antihypertensives = lambda x: x in atc2rxnorm['C02']
         drug_criterion = {'antidiabetic': is_antidiabetic, 'antihypertensives': is_antihypertensives}
-        df_treated = build_patient_characteristics_from_triples(treated, ccwcomorid_name, drug_criterion)
-        df_control = build_patient_characteristics_from_triples(controlled_sample, ccwcomorid_name, drug_criterion)
+        # df_treated = build_patient_characteristics_from_triples(treated, ccwcomorid_name, drug_criterion)
+        df_treated = build_patient_characteristics_from_triples_v2(treated, ccwcomorid_name, drug_criterion)
+        # df_control = build_patient_characteristics_from_triples(controlled_sample, ccwcomorid_name, drug_criterion)
+        df_control = build_patient_characteristics_from_triples_v2(controlled_sample, ccwcomorid_name, drug_criterion)
         add_row = pd.Series({'treat': args.treated_drug,
                              'control': ';'.join([x.split('.')[0] for x in controlled_drugs_range]),
                              'p-value': np.nan},

@@ -305,6 +305,73 @@ def build_patient_characteristics_from_triples(trips, comorbidityid_2_name, drug
     return drug_patient
 
 
+def build_patient_characteristics_from_triples_v2(trips, comorbidityid_2_name, drug_criterion):
+    # demo_feature_vector: [age, sex, race, days_since_mci]
+    # triple = (patient,
+    #           [rx_codes, dx_codes, demo_feature_vector[0], demo_feature_vector[1], demo_feature_vector[3]],
+    #           (outcome, outcome_t2e))
+    # if drug_coding.lower() == 'gpi':
+    #     is_antidiabetic = lambda x: (x[:2] == '27')
+    #     is_antihypertensives = lambda x: (x[:2] == '36')
+    # else:
+    #     is_antidiabetic = lambda x: x in atc2rxnorm['A10']
+    #     is_antihypertensives = lambda x: x in atc2rxnorm['C02']
+    # drug_criterion = {'antidiabetic':is_antidiabetic, 'antihypertensives':is_antihypertensives}
+    # start_time = time.time()
+    patid_list = [x[0] for x in trips]
+    columns = ['age', 'sex', 'days_since_mci', 'AD', 't2e',
+               'antidiabetic', 'antihypertensives',
+               'Alcohol Use Disorders',
+               'Anxiety Disorders', 'Depression', 'Diabetes', 'Heart Failure',
+               'Hyperlipidemia', 'Hypertension', 'Ischemic Heart Disease', 'Obesity',
+               'Stroke / Transient Ischemic Attack', 'Tobacco Use',
+               'Traumatic Brain Injury and Nonpsychotic Mental Disorders due to Brain Damage',
+               'Sleep disorders', 'Periodontitis', 'Menopause']
+    col_id = {columns[i] : i for i in range(len(columns))}
+    drug_patient = {patid_list[i]: np.zeros(len(columns)) for i in range(len(patid_list))}
+
+    for record in tqdm(trips):
+        patient = record[0]
+        rx_codes = record[1][0]
+        dx_codes = record[1][1]
+
+        # build patient characteristics of this drug trial
+        drug_patient[patient][col_id['age']] = record[1][2]
+        drug_patient[patient][col_id['sex']] = record[1][3]
+        drug_patient[patient][col_id['days_since_mci']] = np.round(record[1][4] / 30.)
+
+        drug_patient[patient][col_id['AD']] = record[2][0]
+        drug_patient[patient][col_id['t2e']] = np.round(record[2][1] / 30.)
+
+        crx = Counter([x for l in rx_codes for x in l])
+        for rx, v in crx.items():
+            for key, fc in drug_criterion.items():
+                if fc(rx):
+                    drug_patient[patient][col_id[key]] += v
+
+        # for rx_list in rx_codes:
+        #     for rx in rx_list:
+        #         for key, fc in drug_criterion.items():
+        #             if fc(rx):
+        #                 drug_patient.at[patient, key] += 1
+
+        cdx = Counter([x for l in dx_codes for x in l])
+        for k, v in cdx.items():
+            if k in comorbidityid_2_name:
+                ccwname = comorbidityid_2_name[k]
+                drug_patient[patient][col_id[ccwname]] += v
+
+        # for dx_list in dx_codes:
+        #     for dx in dx_list:
+        #         if dx in comorbidityid_2_name:
+        #             ccwname = comorbidityid_2_name[dx]
+        #             drug_patient.at[patient, ccwname] += 1
+
+    df = pd.DataFrame.from_dict(drug_patient, orient='index', columns=columns)
+
+    return df
+
+
 def statistics_for_treated_control(treat, control, out_file, add_rows=None):
     print(treat.columns)
 
