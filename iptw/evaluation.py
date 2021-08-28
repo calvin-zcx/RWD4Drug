@@ -174,10 +174,10 @@ def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1
 
     # 5. Survival
     if report >= 5:
-        survival, survival_w, cox_HR = cal_survival_KM(T, PS_logits, Y, normalized)
+        survival, survival_w, cox_HR_ori, cox_HR = cal_survival_KM(T, PS_logits, Y, normalized)
         kmf1, kmf0, ate, survival_1, survival_0, results = survival
         kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w = survival_w
-        KM_ALL = (survival, survival_w, cox_HR)
+        KM_ALL = (survival, survival_w, cox_HR_ori, cox_HR)
         if verbose:
             print('KM_treated at [180, 365, 540, 730]:', survival_1,
                   'KM_control at [180, 365, 540, 730]:', survival_0)
@@ -186,7 +186,8 @@ def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1
                   'KM_control_IPTW at [180, 365, 540, 730]:', survival_0_w)
             print('KM_treated - KM_control:', ate)
             print('KM_treated_IPTW - KM_control_IPTW:', ate_w)
-            print('Cox Hazard ratio {} (CI: {})'.format(cox_HR[0], cox_HR[1]))
+            print('Cox Hazard ratio ori {} (CI: {})'.format(cox_HR_ori[0], cox_HR_ori[1]))
+            print('Cox Hazard ratio iptw {} (CI: {})'.format(cox_HR[0], cox_HR[1]))
             # results_w.print_summary()
             ax = plt.subplot(111)
             ax.set_title(os.path.basename(figsave))
@@ -255,7 +256,7 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
              [180, 365, 540, 730],
              tkm[0][3], tkm[0][4], tkm[0][2],
              tkm[1][3], tkm[1][4], tkm[1][2],
-             tkm[2][0], tkm[2][1],
+             tkm[2][0], tkm[2][1], tkm[3][0], tkm[3][1],
              tw[1].sum(), tw[2].sum(),
              tw[3], tw[4], tw[5], tw[6],
              ';'.join(feature_name[np.where(tsmd[1] > SMD_THRESHOLD)[0]]),
@@ -271,7 +272,7 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_IPTW', 'HR_IPTW_CI',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI', 'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
@@ -343,7 +344,7 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
              [180, 365, 540, 730],
              tkm[0][3], tkm[0][4], tkm[0][2],
              tkm[1][3], tkm[1][4], tkm[1][2],
-             tkm[2][0], tkm[2][1],
+             tkm[2][0], tkm[2][1], tkm[3][0], tkm[3][1],
              tw[1].sum(), tw[2].sum(),
              tw[3], tw[4], tw[5], tw[6],
              ';'.join(feature_name[np.where(tsmd[1] > SMD_THRESHOLD)[0]]),
@@ -359,7 +360,7 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_IPTW', 'HR_IPTW_CI',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI', 'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
@@ -593,12 +594,19 @@ def cal_survival_KM(golds_treatment, logits_treatment, golds_outcome, normalized
     cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights':weight})
     try:
         cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
-
         HR = cph.hazard_ratios_['treatment']
         CI = np.exp(cph.confidence_intervals_.values.reshape(-1))
+
+        cph_ori = CoxPHFitter()
+        cox_data_ori = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment})
+        cph_ori.fit(cox_data_ori, 'T', 'event')
+        HR_ori = cph_ori.hazard_ratios_['treatment']
+        CI_ori = np.exp(cph_ori.confidence_intervals_.values.reshape(-1))
     except:
         cph = HR = CI = None
+        cph_ori = HR_ori = CI_ori = None
 
     return (kmf1, kmf0, ate, survival_1, survival_0, results), \
            (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w), \
+           (HR_ori, CI_ori, cph_ori), \
            (HR, CI, cph)

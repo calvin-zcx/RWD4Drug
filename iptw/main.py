@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--med_code_topk', type=int, default=200)
     parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     parser.add_argument('--stats', action='store_true')
+    parser.add_argument('--stats_exit', action='store_true')
     # Deep PSModels
     parser.add_argument('--batch_size', type=int, default=256)  #768)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
@@ -301,7 +302,7 @@ if __name__ == "__main__":
           ' and the atc control cohort may have less patients than expected)'.format(args.controlled_drug_ratio))
 
     # 1-B: calculate the statistics of treated v.s. control
-    if args.stats:
+    if args.stats or args.stats_exit:
         # demo_feature_vector: [age, sex, race, days_since_mci]
         # triple = (patient,
         #           [rx_codes, dx_codes, demo_feature_vector[0], demo_feature_vector[1], demo_feature_vector[3]],
@@ -336,6 +337,10 @@ if __name__ == "__main__":
             args.save_model_filename + '_stats.csv',
             add_row)
         print('Characteristics statistic of treated v.s. control, done!')
+        if args.stats_exit:
+            print('Only run stats! stats_exit! Total Time used:',
+                  time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+            sys.exit(5)  # stats_exit only run statas
 
     # 1-C: build pytorch dataset
     print("Constructed Dataset, choose med_code_topk:", args.med_code_topk)
