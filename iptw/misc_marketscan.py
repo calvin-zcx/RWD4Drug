@@ -24,7 +24,10 @@ import seaborn as sns
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 5
+MAX_NO_UNBALANCED_FEATURE = 0
+MIN_SUCCESS_RATE = 0.5   # 0.1
+MIN_SUPPORT = MIN_SUCCESS_RATE * 100
+# 5
 # 5
 print('Global MAX_NO_UNBALANCED_FEATURE: ', MAX_NO_UNBALANCED_FEATURE)
 
@@ -141,53 +144,8 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
 
 
 def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
-    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
-
-    # load others:
-    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
-    added_drug = []
-    for index, row in df.iterrows():
-        rx = row['rxcui']
-        gpi = row['gpi']
-        if pd.notna(rx):
-            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
-            added_drug.extend(rx)
-
-        if pd.notna(gpi):
-            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
-            added_drug.extend(gpi)
-
-    print('len(added_drug): ', len(added_drug))
-    print(added_drug)
-
-    fo.write('mkdir -p output/{}/{}/log\n'.format(cohort_dir_name, model))
-    n = 0
-    for x in name_cnt:
-        k, v = x
-        if (v >= min_patients) or (k in added_drug):
-            drug = k.split('.')[0]
-            for ctrl_type in ['random', 'atc']:
-                for seed in range(0, niter):
-                    cmd = "python main.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
-                        cohort_dir_name, drug,
-                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
-                        cohort_dir_name, model, drug, seed, ctrl_type, model)
-                    fo.write(cmd)
-                    n += 1
-
-    fo.close()
-    print('In total ', n, ' commands')
-
-
-def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
-    cohort_size = pickle.load(
-        open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('shell_{}_{}_marketscan.sh'.format(model, cohort_dir_name), 'w')  # 'a'
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
 
     # load others:
@@ -216,8 +174,8 @@ def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, 
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, niter):
                     cmd = "python main.py --data_dir ../ipreprocess/output_marketscan/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output_marketscan/{}/{}/ --random_seed {} " \
-                          "--drug_coding gpi --med_code_topk 200 {} {} " \
+                          "--controlled_drug {} --run_model {} --output_marketscan_dir output_marketscan/{}/{}/ --random_seed {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
                           "2>&1 | tee output_marketscan/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
                         ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
@@ -227,6 +185,45 @@ def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, 
 
     fo.close()
     print('In total ', n, ' commands')
+
+
+def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para='', selected=False):
+    if not selected:
+        cohort_size = pickle.load(
+            open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+        name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+    else:
+        d = pd.read_excel(r'../iptw/output_marketscan/{}/selected_drug_list.xlsx'.format(cohort_dir_name),
+                          dtype={'drug':str})
+        name_cnt = []
+        for index, row in d.iterrows():
+            drug = row['drug']
+            n = row['n_treat']
+            name_cnt.append([drug, n])
+
+    fo = open('shell_{}_{}_marketscan.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+
+    fo.write('mkdir -p output_marketscan/{}/{}/log\n'.format(cohort_dir_name, model))
+    n_cmd = n_drug = 0
+    for x in name_cnt:
+        k, v = x
+        if (v >= min_patients):
+            drug = k.split('.')[0]
+            n_drug += 1
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main.py --data_dir ../ipreprocess/output_marketscan/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output_marketscan/{}/{}/ --random_seed {} " \
+                          "--drug_coding gpi --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output_marketscan/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n_cmd += 1
+
+    fo.close()
+    print('In total ', n_drug, 'dugs ', n_cmd, ' commands')
 
 
 def shell_for_ml_marketscan_stats_exist(cohort_dir_name, model, niter=10, min_patients=500):
@@ -291,10 +288,10 @@ def split_shell_file(fname, divide=2, skip_first=1):
 
 
 def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -397,7 +394,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                                                "train_nsmd_nsmd", "trainval_maxsmd_nsmd", "trainval_nsmd_nsmd",
                                                "trainval_final_finalnsmd"], rot=25, fontsize=15, ax=ax1)
             ax1.axhline(y=5, color='r', linestyle='-')
-            boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug), '0-19', t, model), fontsize=25)
+            boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug)[:30], '0-19', t, model), fontsize=25)
             # plt.xlabel("Model selection methods", fontsize=15)
             ax1.set_ylabel("#unbalanced_feat_iptw of boostrap experiments", fontsize=20)
             # fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}-allnsmd.png'.format(t))
@@ -414,15 +411,16 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
             ax2.set_ylabel("test_auc of boostrap experiments", fontsize=20)
             plt.tight_layout()
             fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}.png'.format(t))
-            plt.clf()
+            # plt.clf()
+            plt.close()
     print()
 
 
 def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -495,10 +493,10 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
 
 
 def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -580,10 +578,10 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
 
 
 def results_ATE_for_ml(cohort_dir_name, model, niter=50):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -611,10 +609,10 @@ def results_ATE_for_ml(cohort_dir_name, model, niter=50):
 
 
 def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    cohort_size = pickle.load(open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -710,8 +708,8 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
 
 
 def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), sheet_name=None)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
+    df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), sheet_name=None, dtype={'drug':str})
     writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model),
                             engine='xlsxwriter')
     for sheet in ['random', 'atc', 'all']:
@@ -762,10 +760,10 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
 
 
 def combine_ate_final_LR_with(cohort_dir_name, model):
-    dirname = r'output/{}/LR/'.format(cohort_dir_name)
+    dirname = r'output_marketscan/{}/LR/'.format(cohort_dir_name)
     df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format('LR'), sheet_name=None,
                           dtype=str)
-    df_other = pd.read_excel(r'output/{}/{}/'.format(cohort_dir_name, model) +
+    df_other = pd.read_excel(r'output_marketscan/{}/{}/'.format(cohort_dir_name, model) +
                              'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model), sheet_name=None, dtype=str)
     writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_cat_{}.xlsx'.format(model),
                             engine='xlsxwriter')
@@ -870,11 +868,11 @@ def check_drug_name_code():
 
 
 def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
+    idx = dfall['success_rate-trainval_final_finalnsmd'] >= MIN_SUCCESS_RATE # 0.1
+    idx_auc = dfall['success_rate-val_auc_nsmd'] >= MIN_SUCCESS_RATE  # 0.1
+    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= MIN_SUCCESS_RATE # 0.1
     print('Total drug trials: ', len(idx))
     print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
     print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
@@ -904,12 +902,13 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     paucsmd = np.array(df.loc[:, "p-succes-auc-vs-maxsmd"])
 
     xlabels = df.loc[:, 'drug_name']
-
-    width = 0.45  # the width of the bars
+    # xlabels = df.loc[:, 'drug_name'].apply(lambda x : min(x.split('/'), key=str))
+    xlabels = [s[:18] for s in xlabels]
+    width = 0.3 # 0.45  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
 
     colors = ['#FAC200', '#82A2D3', '#F65453']
-    fig, ax = plt.subplots(figsize=(18, 8))
+    fig, ax = plt.subplots(figsize=(40, 8))
     error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
     # plt.ylim([0, 1.05])
     rects1 = ax.bar(ind, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1], error_kw=error_kw,
@@ -1009,16 +1008,17 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
         fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}.png'.format(model, contrl_type))
         fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}.pdf'.format(model, contrl_type))
     plt.show()
-    plt.clf()
+    # plt.clf()
+    plt.close()
 
 
 def bar_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
                           sheet_name=contrl_type)
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
+    idx = dfall['success_rate-trainval_final_finalnsmd'] >= MIN_SUCCESS_RATE
+    idx_auc = dfall['success_rate-val_auc_nsmd'] >= MIN_SUCCESS_RATE
+    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= MIN_SUCCESS_RATE
     print('Total drug trials: ', len(idx))
     print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
     print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
@@ -1156,12 +1156,12 @@ def bar_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dum
 
 
 def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
+    idx = dfall['success_rate-trainval_final_finalnsmd'] >= MIN_SUCCESS_RATE # 0.1
+    idx_auc = dfall['success_rate-val_auc_nsmd'] >= MIN_SUCCESS_RATE # 0.1
+    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= MIN_SUCCESS_RATE # 0.1
     print('Total drug trials: ', len(idx))
     print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
     print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
@@ -1173,6 +1173,7 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     N = len(df)
     drug_list = df.loc[idx, 'drug']
     drug_name_list = df.loc[idx, 'drug_name']
+    drug_name_list = [s[:18] for s in drug_name_list]
 
     data_1 = []
     data_2 = []
@@ -1195,8 +1196,8 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
         data_pvalue.append([test_orig1[1], test_orig2[1], test_orig3[1]])
 
     colors = ['#FAC200', '#82A2D3', '#F65453']
-    fig, ax = plt.subplots(figsize=(18, 8))
-    width = 0.5  # the width of the bars
+    fig, ax = plt.subplots(figsize=(45, 8)) #(18, 8)
+    width = 0.3  # 0.5  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
     sym = 'o'
     # 'meanline':True,
@@ -1305,12 +1306,12 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
 
 
 def box_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
+    idx = dfall['success_rate-trainval_final_finalnsmd'] >= MIN_SUCCESS_RATE
+    idx_auc = dfall['success_rate-val_auc_nsmd'] >= MIN_SUCCESS_RATE
+    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= MIN_SUCCESS_RATE
     print('Total drug trials: ', len(idx))
     print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
     print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
@@ -1468,8 +1469,8 @@ def box_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dum
 
 
 def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    dirname2 = r'output/{}/{}/'.format(cohort_dir_name, model2)
+    dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
+    dirname2 = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model2)
     df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model),
                            dtype={'drug': str},
                            sheet_name=None)
@@ -1482,11 +1483,11 @@ def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', du
     # Only select drugs with selection criteria trial
     # 1. minimum support set 10, may choose 20 later
     # 2. p value < 0.05
-    idx = (df['support'] >= 50) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
+    idx = (df['support'] >= MIN_SUPPORT) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
     df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
 
     df2 = df_all2[contrl_type]
-    idx2 = (df2['support'] >= 50) & (df2['pvalue-KM1-0_IPTW'] <= 0.05)
+    idx2 = (df2['support'] >= MIN_SUPPORT) & (df2['pvalue-KM1-0_IPTW'] <= 0.05)
     df_sort2 = df2.loc[idx2, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
 
     data_1 = []
@@ -1494,6 +1495,7 @@ def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', du
     data_pvalue = []
     drug_list = df_sort['drug'].tolist()
     drug_name_list = df_sort['drug_name'].tolist()
+    drug_name_list = [s[:18] for s in drug_name_list]
     drug_list2 = df_sort2['drug'].tolist()
     print('len(drug_list):', len(drug_list), 'len(drug_list2)', len(drug_list2))
     N = len(drug_list)
@@ -1542,8 +1544,8 @@ def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', du
         #     r.extend([np.nan, np.nan, np.nan, np.nan, np.nan])
 
     colors = ['#F65453', '#82A2D3', '#FAC200']
-    fig, ax = plt.subplots(figsize=(12, 8)) #18
-    width = 0.35  # 0.5 #the width of the bars
+    fig, ax = plt.subplots(figsize=(38, 8))
+    width = 0.5  # the width of the bars
     ind = np.arange(N) * width * (n_box + 1)  # the x locations for the groups
     sym = 'o'
     # 'meanline':True,
@@ -1665,7 +1667,8 @@ def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', du
         fig.savefig(
             dirname + 'results/fig/adjusted_survival_diff_boxplot-{}-{}-{}.pdf'.format(model, model2, contrl_type))
     plt.show()
-    plt.clf()
+    # plt.clf()
+    plt.close()
 
 
 def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random', dump=True):
@@ -1673,7 +1676,7 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
     df_all_list = []
     data_list = []
     for model in models:
-        dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+        dirname = r'output_marketscan/{}/{}/'.format(cohort_dir_name, model)
         df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model),
                                dtype={'drug': str},
                                sheet_name=None)
@@ -1685,7 +1688,7 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
         # Only select drugs with selection criteria trial
         # 1. minimum support set 10, may choose 20 later
         # 2. p value < 0.05
-        idx = (df['support'] >= 50) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
+        idx = (df['support'] >= MIN_SUPPORT) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
         df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
 
         data = []
@@ -1823,9 +1826,14 @@ if __name__ == '__main__':
     # rvs2 = stats.norm.rvs(loc=0, scale=10, size=(100, 1))
     # p, test_orig = bootstrap_mean_pvalue_2samples(rvs, rvs2)
 
-    with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
-        drug_name = pickle.load(f)
-        print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
+    with open(r'pickles/_gpi_ingredients_nameset_cnt.pkl', 'rb') as f:
+        # change later, move this file to pickles also
+        gpiing_names_cnt = pickle.load(f)
+        drug_name = {}
+        for key, val in gpiing_names_cnt.items():
+            drug_name[key] = '/'.join(val[0])
+            # drug_name[key] = min(val[0], key=len)
+        print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
 
     # shell_for_ml_marketscan_stats_exist(cohort_dir_name='save_cohort_all_loose', model='LR', niter=10)
 
@@ -1834,6 +1842,10 @@ if __name__ == '__main__':
     #
     # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # split_shell_file("shell_LIGHTGBM_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
+
+    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
+                            more_para='--epochs 10 --batch_size 128', selected=True)
+    split_shell_file("shell_LSTM_save_cohort_all_loose_marketscan.sh", divide=3, skip_first=1)
 
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
@@ -1848,21 +1860,25 @@ if __name__ == '__main__':
     # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
     # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    #
+    # #
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
     # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
-    #
-    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
-    #
-    # major plots from 3 methods
+    # #
+    # # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
+    # #
+    # # major plots from 3 methods
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # #
+    # # #
     # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    # box_plot_ate(cohort_dir_name, model=model, model2='LR', contrl_type='all')
+
+
     #
     # # # ## all methods plots in appendix
     # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
@@ -1879,7 +1895,7 @@ if __name__ == '__main__':
 
     # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
     # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='all')
-    box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
+    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
     #
     # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
     # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='atc')
@@ -1891,6 +1907,6 @@ if __name__ == '__main__':
 
     # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random')
     # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='atc')
-    box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
+    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
 
     print('Done')
