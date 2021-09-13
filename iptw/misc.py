@@ -1155,6 +1155,150 @@ def bar_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dum
     plt.clf()
 
 
+def bar_plot_model_selectionV2_test(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
+                          sheet_name=contrl_type)
+    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
+    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
+    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
+    print('Total drug trials: ', len(idx))
+    print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
+    print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
+    print(r"#df['success_rate-val_maxsmd_nsmd'] > 0: ", idx_smd.sum(), '({:.2f}%)'.format(idx_smd.mean() * 100))
+
+    df = dfall.loc[idx, :].sort_values(by=['success_rate-trainval_final_finalnsmd'], ascending=[False])
+    # df['nsmd_mean_ci-val_auc_nsmd']
+
+    N = len(df)
+    col = ['success_rate-val_auc_nsmd']#, 'success_rate-val_maxsmd_nsmd']
+        # , 'success_rate-val_nsmd_nsmd',
+        #    'success_rate-train_maxsmd_nsmd', 'success_rate-train_nsmd_nsmd',
+        #    'success_rate-trainval_maxsmd_nsmd', 'success_rate-trainval_nsmd_nsmd',
+        #    'success_rate-trainval_final_finalnsmd']
+    legs = ['_'.join(x.split('-')[1].split('_')[:-1]) for x in col]
+    # col_ci = [x.replace('rate', 'rate_ci') for x in col]
+    top = []
+    top_ci = []
+    for c in col:
+        top.append(df.loc[:, c])
+        top_ci.append(np.array(df.loc[:, c.replace('rate', 'rate_ci')].apply(lambda x: stringlist_2_list(x)).to_list()))
+
+    pauc = np.array(df.loc[:, "p-succes-final-vs-auc"])
+    psmd = np.array(df.loc[:, "p-succes-final-vs-maxsmd"])
+    paucsmd = np.array(df.loc[:, "p-succes-auc-vs-maxsmd"])
+
+    xlabels = df.loc[:, 'drug_name']
+
+    width = 0.45  # the width of the bars
+    ind = np.arange(N) * width * (len(col) + 1)  # the x locations for the groups
+
+    colors = ['#FAC200', '#82A2D3', '#F65453']
+    fig, ax = plt.subplots(figsize=(24, 8))
+    error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
+    plt.ylim([0, 1.1])
+    rects = []
+    for i in range(len(top)):
+        top_1 = top[i]
+        top_1_ci = top_ci[i]
+        if i <= 1 or i == len(top) - 1:
+            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
+                          error_kw=error_kw,
+                          color=colors[min(i, len(colors) - 1)], edgecolor=None)  # "black")
+        else:
+            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
+                          error_kw=error_kw,
+                          edgecolor="black")
+        rects.append(rect)
+
+    ax.set_xticks(ind + int(len(top) / 2) * width)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    # ax.spines['bottom'].set_color('#DDDDDD')
+    ax.set_axisbelow(True)
+    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
+    ax.yaxis.grid(True, color='#EEEEEE', which='both')
+    ax.xaxis.grid(False)
+    ax.set_xticklabels(xlabels, fontsize=20, rotation=45, ha='right')
+    ax.tick_params(axis='both', which='major', labelsize=20)
+    ax.set_xlabel("Drug Trials", fontsize=25)
+    ax.set_ylabel("Prop. of success balancing", fontsize=25)  # Success Rate of Balancing
+
+    def significance(val):
+        if val < 0.001:
+            return '***'
+        elif val < 0.01:
+            return '**'
+        elif val < 0.05:
+            return '*'
+        else:
+            return 'ns'
+
+    def labelvalue(rects, val, height=None):
+        for i, rect in enumerate(rects):
+            if height is None:
+                h = rect.get_height() * 1.02
+            else:
+                h = height[i] * 1.02
+            ax.text(rect.get_x() + rect.get_width() / 2., h,
+                    significance(val[i]),
+                    ha='center', va='bottom', fontsize=11)
+
+    for i in range(len(rects) - 1):
+        pv = np.array(df.loc[:, "p-succes-fvs-" + col[i].split('-')[-1]])
+        labelvalue((rects[i]), pv, top_ci[i][:, 1])
+
+    # labelvalue(rects1, pauc, top_1_ci[:,1])
+    # labelvalue(rects2, psmd, top_2_ci[:,1])
+
+    # for i, rect in enumerate(rects3):
+    #     d = 0.02
+    #     y = top_3_ci[i, 1] * 1.03  # rect.get_height()
+    #     w = rect.get_width()
+    #     x = rect.get_x()
+    #     x1 = x - 2 * w
+    #     x2 = x - 1 * w
+    #
+    #     y1 = top_1_ci[i, 1] * 1.03
+    #     y2 = top_2_ci[i, 1] * 1.03
+    #
+    #     # auc v.s. final
+    #     l, r = x1, x + w
+    #     ax.plot([l, l, (l+r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
+    #     ax.plot([(l+r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
+    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+    #     ax.text((l+r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
+    #
+    #     # smd v.s. final
+    #     l, r = x2 + 0.6*w, x + w
+    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
+    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
+    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
+    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
+    #
+    #     # auc v.s. smd
+    #     l, r = x1, x2 + 0.4*w
+    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
+    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
+    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
+
+    # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
+    ax.legend((rect[0] for rect in rects), (x for x in legs),
+              fontsize=18)  # , bbox_to_anchor=(1.13, 1.01))
+
+    # ax.autoscale(enable=True, axis='x', tight=True)
+    ax.set_xmargin(0.01)
+    plt.tight_layout()
+    if dump:
+        check_and_mkdir(dirname + 'results/fig/')
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-auc.png'.format(model, contrl_type))
+        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-auc.pdf'.format(model, contrl_type))
+    plt.show()
+    plt.clf()
+
+
 def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
     dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
@@ -1868,6 +2012,10 @@ if __name__ == '__main__':
     # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
     # #
     # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
@@ -1879,7 +2027,7 @@ if __name__ == '__main__':
 
     # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
     # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='all')
-    box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
+    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
     #
     # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
     # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='atc')
@@ -1891,6 +2039,6 @@ if __name__ == '__main__':
 
     # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random')
     # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='atc')
-    box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
+    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
 
     print('Done')
