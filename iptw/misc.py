@@ -24,7 +24,7 @@ import seaborn as sns
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 5
+MAX_NO_UNBALANCED_FEATURE = 10 #5
 # 5
 print('Global MAX_NO_UNBALANCED_FEATURE: ', MAX_NO_UNBALANCED_FEATURE)
 
@@ -763,17 +763,27 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
 
 def combine_ate_final_LR_with(cohort_dir_name, model):
     dirname = r'output/{}/LR/'.format(cohort_dir_name)
-    df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format('LR'), sheet_name=None,
+    df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo-allPvalue.xlsx'.format('LR'), sheet_name=None,
                           dtype=str)
     df_other = pd.read_excel(r'output/{}/{}/'.format(cohort_dir_name, model) +
-                             'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model), sheet_name=None, dtype=str)
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_cat_{}.xlsx'.format(model),
+                             'results/summarized_IPTW_ATE_{}_finalInfo-allPvalue.xlsx'.format(model), sheet_name=None, dtype=str)
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_cat_{}-allPvalue.xlsx'.format(model),
                             engine='xlsxwriter')
-    writer2 = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_outerjoin_{}.xlsx'.format(model),
+    writer2 = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_outerjoin_{}-allPvalue.xlsx'.format(model),
                              engine='xlsxwriter')
 
     col_name = ['drug', 'Drug', 'Model', 'niters', 'Support', 'Treat', 'Ctrl',
                 'n_feature', ' Unbalanced', 'Unbalanced IPTW', 'KM', 'HR']
+
+    def significance(val):
+        if val < 0.001:
+            return '***'
+        elif val < 0.01:
+            return '**'
+        elif val < 0.05:
+            return '*'
+        else:
+            return 'ns'
 
     def return_select_content(key, row, null_model=''):
         data = [key, ]
@@ -790,8 +800,8 @@ def combine_ate_final_LR_with(cohort_dir_name, model):
         else:
             for c in col1:
                 data.append(row[c])
-            data.append(row['mean-KM1-0_IPTW'] + ' (' + row['mean_ci-KM1-0_IPTW'] + ')')
-            data.append(row['mean-HR_IPTW'] + ' (' + row['mean_ci-HR_IPTW'] + ')')
+            data.append(row['mean-KM1-0_IPTW'] + ' (' + row['mean_ci-KM1-0_IPTW'] + ')' + '$^{'+ significance(float(row['pvalue-KM1-0_IPTW']))+'}$')
+            data.append(row['mean-HR_IPTW'] + ' (' + row['mean_ci-HR_IPTW'] + ')'+ '$^{'+ significance(float(row['pvalue-HR_IPTW']))+'}$')
         return data
 
     for sheet in ['random', 'atc', 'all']:
@@ -1989,34 +1999,34 @@ if __name__ == '__main__':
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    #
-    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+
+    results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
     #
     # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
     #
     # major plots from 3 methods
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # #
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
     #
-    # # # ## all methods plots in appendix
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
-    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # #
+    # # # ## all methods plots in appendix
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    # # #
     # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')

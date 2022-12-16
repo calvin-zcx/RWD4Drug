@@ -25,7 +25,7 @@ import seaborn as sns
 print = functools.partial(print, flush=True)
 
 MAX_NO_UNBALANCED_FEATURE = 0
-MIN_SUCCESS_RATE = 0.5   # 0.1
+MIN_SUCCESS_RATE = 0.1 #0.5 # 0.1   # 0.1
 MIN_SUPPORT = MIN_SUCCESS_RATE * 100
 # 5
 # 5
@@ -908,7 +908,7 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     ind = np.arange(N) * width * 4  # the x locations for the groups
 
     colors = ['#FAC200', '#82A2D3', '#F65453']
-    fig, ax = plt.subplots(figsize=(40, 8))
+    fig, ax = plt.subplots(figsize=(36, 8))
     error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
     # plt.ylim([0, 1.05])
     rects1 = ax.bar(ind, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1], error_kw=error_kw,
@@ -1173,7 +1173,7 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     N = len(df)
     drug_list = df.loc[idx, 'drug']
     drug_name_list = df.loc[idx, 'drug_name']
-    drug_name_list = [s[:18] for s in drug_name_list]
+    # drug_name_list = [s[:18] for s in drug_name_list]
 
     data_1 = []
     data_2 = []
@@ -1495,7 +1495,7 @@ def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', du
     data_pvalue = []
     drug_list = df_sort['drug'].tolist()
     drug_name_list = df_sort['drug_name'].tolist()
-    drug_name_list = [s[:18] for s in drug_name_list]
+    # drug_name_list = [s[:18] for s in drug_name_list]
     drug_list2 = df_sort2['drug'].tolist()
     print('len(drug_list):', len(drug_list), 'len(drug_list2)', len(drug_list2))
     N = len(drug_list)
@@ -1831,8 +1831,14 @@ if __name__ == '__main__':
         gpiing_names_cnt = pickle.load(f)
         drug_name = {}
         for key, val in gpiing_names_cnt.items():
-            drug_name[key] = '/'.join(val[0])
+            drug_name[key] = '/'.join(val[0]).lower()
             # drug_name[key] = min(val[0], key=len)
+
+        df_name = pd.read_excel(r'pickles/selected_drug_list_complednames.xlsx', dtype=str)
+        for index, row in df_name.iterrows():
+            did = row['drug']
+            dname = row['drug_name_compiled']
+            drug_name[did] = dname
         print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
 
     # shell_for_ml_marketscan_stats_exist(cohort_dir_name='save_cohort_all_loose', model='LR', niter=10)
@@ -1843,9 +1849,9 @@ if __name__ == '__main__':
     # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
     # split_shell_file("shell_LIGHTGBM_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
 
-    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
-                            more_para='--epochs 10 --batch_size 128', selected=True)
-    split_shell_file("shell_LSTM_save_cohort_all_loose_marketscan.sh", divide=3, skip_first=1)
+    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
+    #                         more_para='--epochs 10 --batch_size 128', selected=True)
+    # split_shell_file("shell_LSTM_save_cohort_all_loose_marketscan.sh", divide=3, skip_first=1)
 
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
@@ -1857,24 +1863,24 @@ if __name__ == '__main__':
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    #
+    results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
+
+    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
+    #
+    # major plots from 3 methods
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
     # #
-    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
-    # #
-    # # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
-    # #
-    # # major plots from 3 methods
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # # #
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
     # box_plot_ate(cohort_dir_name, model=model, model2='LR', contrl_type='all')
 
