@@ -18,6 +18,7 @@ from ipreprocess.utils import load_icd_to_ccw
 from PSModels import mlp, lstm, ml
 import itertools
 from tqdm import tqdm
+from sklearn.model_selection import KFold
 
 import functools
 print = functools.partial(print, flush=True)
@@ -41,7 +42,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=256)  #768)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-6)  # )0001)
-    parser.add_argument('--epochs', type=int, default=15)  # 30
+    parser.add_argument('--epochs', type=int, default=3)  # 15 #30
     # LSTM
     parser.add_argument('--diag_emb_size', type=int, default=128)
     parser.add_argument('--med_emb_size', type=int, default=128)
@@ -396,7 +397,6 @@ if __name__ == "__main__":
     # %%  LSTM-PS PSModels
     if args.run_model == 'LSTM':
         print("**************************************************")
-        print("**************************************************")
         print('LSTM-Attention PS PSModels learning:')
         # paras_grid = {
         #     'hidden_size': [32, 64, 100, 128], #100
@@ -405,16 +405,17 @@ if __name__ == "__main__":
         #     'batch_size': [32, 50, 64, 128],  #50
         # }
         paras_grid = {
-            'hidden_size': [32, 64, 100, 128],  # 100
+            'hidden_size': [32, 64, 128], #[32, 64, 100, 128],  # 100
             'lr': [1e-3],
             'weight_decay': [1e-6],
-            'batch_size': [50],  # 50
+            'batch_size': [50],  # 50 # default as baseline work
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
         hyper_paras_list = list(itertools.product(*hyper_paras_v))
         print('Model {} Searching Space N={}: '.format(args.run_model, len(hyper_paras_list)), paras_grid)
 
         best_hyper_paras = None
+        best_model_params = None
         best_model = None
         best_auc = float('-inf')
         best_balance = float('inf')
@@ -422,19 +423,23 @@ if __name__ == "__main__":
         global_best_balance = float('inf')
         best_model_epoch = -1
         results = []
-        i = -1
         i_iter = -1
-        for hyper_paras in tqdm(hyper_paras_list):
-            i += 1
-            hidden_size, lr, weight_decay, batch_size = hyper_paras
-            print('In hyper-paras space [{}/{}]...'.format(i, len(hyper_paras_list)))
-            print(hyper_paras_names)
-            print(hyper_paras)
+        kfold = 10
 
-            train_loader_shuffled = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
-                                                                sampler=train_sampler)
-            print('len(train_loader_shuffled): ', len(train_loader_shuffled),
-                  'train_loader_shuffled.batch_size: ', train_loader_shuffled.batch_size)
+        for i, hyper_paras in tqdm(enumerate(hyper_paras_list, 1), total=len(hyper_paras_list)):
+            hidden_size, lr, weight_decay, batch_size = hyper_paras
+
+            i_model_balance_over_kfold = []
+            i_model_fit_over_kfold = []
+
+            print('In hyper-paras space [{}/{}]...'.format(i, len(hyper_paras_list)))
+            # print(hyper_paras_names)
+            print('hyper-paras:', hyper_paras)
+
+            # train_loader_shuffled = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+            #                                                     sampler=train_sampler)
+            # print('len(train_loader_shuffled): ', len(train_loader_shuffled),
+            #       'train_loader_shuffled.batch_size: ', train_loader_shuffled.batch_size)
 
             model_params = dict(
                 med_hidden_size=args.med_hidden_size,  # 64
@@ -449,107 +454,103 @@ if __name__ == "__main__":
                 # pad_index=my_dataset.diag_code_vocab[CodeVocab.PAD_CODE],
             )
             print('Model: LSTM')
-            print(model_params)
-            model = lstm.LSTMModel(**model_params)
-            if args.cuda:
-                model = model.to('cuda')
-            print(model)
+            print('resulting model params:', model_params)
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+            kf = KFold(n_splits=kfold, random_state=args.random_seed, shuffle=True)
+            for k, (train_indices, test_indices) in tqdm(enumerate(kf.split(indices), 1)):
+                print('Training {}th (/{}) model {} over the {}th-fold data'.format(i, len(hyper_paras_list), hyper_paras, k))
 
-            for epoch in tqdm(range(args.epochs)):
-                i_iter += 1
-                epoch_losses_ipw = []
-                for confounder, treatment, outcome in train_loader_shuffled:
-                    model.train()
-                    # train IPW
-                    optimizer.zero_grad()
+                train_index, test_index = np.asarray(indices)[train_indices], np.asarray(indices)[test_indices]
+                train_sampler = SubsetRandomSampler(train_index)
+                test_sampler = SubsetRandomSampler(test_index)
 
-                    if args.cuda:  # confounder = (diag, med, sex, age)
-                        for ii in range(len(confounder)):
-                            confounder[ii] = confounder[ii].to('cuda')
-                        treatment = treatment.to('cuda')
+                train_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                           sampler=train_sampler)
+                test_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
+                                                          sampler=test_sampler)
+                if k == 1:
+                    print('len(train_loader): ', len(train_loader), 'train_loader.batch_size: ', train_loader.batch_size)
+                    print('len(test_loader): ', len(test_loader), 'test_loader.batch_size: ', test_loader.batch_size)
 
-                    treatment_logits, _ = model(confounder)
-                    loss_ipw = F.binary_cross_entropy_with_logits(treatment_logits, treatment.float())
+                model = lstm.LSTMModel(**model_params)
+                if args.cuda:
+                    model = model.to('cuda')
+                # print(model)
+                optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-                    loss_ipw.backward()
-                    optimizer.step()
-                    epoch_losses_ipw.append(loss_ipw.item())
-
-                # just finish 1 epoch
-                # scheduler.step()
-                epoch_losses_ipw = np.mean(epoch_losses_ipw)
+                model, epoch_losses_ipw = lstm.lstm_fit(model, optimizer, args.epochs, train_loader, args.cuda)
 
                 loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data_lstm(model, train_loader, cuda=args.cuda)
-                loss_val, T_val, PS_logits_val, Y_val, X_val = transfer_data_lstm(model, val_loader, cuda=args.cuda)
                 loss_test, T_test, PS_logits_test, Y_test, X_test = transfer_data_lstm(model, test_loader, cuda=args.cuda)
-
+                # (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
                 result_train = _evaluation_helper(X_train, T_train, PS_logits_train, loss_train)
-                result_val = _evaluation_helper(X_val, T_val, PS_logits_val, loss_val)
                 result_test = _evaluation_helper(X_test, T_test, PS_logits_test, loss_test)
 
                 n_train = len(X_train)
-                n_val = len(X_val)
                 n_test = len(X_test)
 
-                result_trainval = _evaluation_helper(
-                    np.concatenate((X_train, X_val)),
-                    np.concatenate((T_train, T_val)),
-                    np.concatenate((PS_logits_train, PS_logits_val)),
-                    _loss_helper([loss_train, loss_val], [n_train, n_val])
-                )
-
                 result_all = _evaluation_helper(
-                    np.concatenate((X_train, X_val, X_test)),
-                    np.concatenate((T_train, T_val, T_test)),
-                    np.concatenate((PS_logits_train, PS_logits_val, PS_logits_test)),
-                    _loss_helper([loss_train, loss_val, loss_test], [n_train, n_val, n_test])
+                    np.concatenate((X_train, X_test)),
+                    np.concatenate((T_train, T_test)),
+                    np.concatenate((PS_logits_train, PS_logits_test)),
+                    _loss_helper([loss_train, loss_test], [n_train, n_test])
                 )
 
-                results.append(
-                    (i_iter, i, epoch,
-                     hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
+                i_model_balance_over_kfold.append(result_all[5])
+                i_model_fit_over_kfold.append(result_test[1])
 
-                print('HP-i:{}, epoch:{}, loss:{}\n'
-                      'trainval-balance:{}, all-balance:{}, val-auc:{}, test-auc:{}'.format(
-                    i, epoch, epoch_losses_ipw, result_trainval[5], result_all[5], result_val[1], result_test[1])
-                )
+                results.append((i, k, hyper_paras, model_params) + result_test + result_all)
 
-                if (result_trainval[5] < best_balance) or \
-                        ((result_trainval[5] == best_balance) and (result_val[1] > best_auc)):
-                    best_model = model
-                    best_hyper_paras = hyper_paras
-                    best_auc = result_val[1]
-                    best_balance = result_trainval[5]
-                    best_model_epoch = epoch
-                    print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
-                          'Epoch: ', epoch, 'trainval-balance:', best_balance, 'val-auc:', best_auc,
-                          "all-balance", result_all[5], "test-auc", result_test[1])
-                    print(hyper_paras_names)
-                    print(hyper_paras)
-                    save_model(model, args.save_model_filename, model_params=model_params)
+            i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
+            i_model_fit = [np.mean(i_model_fit_over_kfold), np.std(i_model_fit_over_kfold)]
 
-                if result_val[1] > global_best_auc:
-                    global_best_auc = result_val[1]
+            if (i_model_balance[0] < best_balance) or \
+                    ((i_model_balance[0] == best_balance) and (i_model_fit[0] > best_auc)):
+                # model with current best configuration re-trained on the whole dataset.
+                best_model = model
+                best_hyper_paras = hyper_paras
+                best_model_params = model_params
 
-                if result_trainval[5] <= global_best_balance:
-                    global_best_balance = result_trainval[5]
+                best_auc = i_model_fit[0]
+                best_balance = i_model_balance[0]
+                # best_model_epoch = epoch
+                print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
+                      'best hyper:', best_hyper_paras,
+                      'best model paras:', best_model_params,
+                      "all-balance", best_balance, 'test-auc:', best_auc,)
+
+            if i_model_fit[0] > global_best_auc:
+                global_best_auc = i_model_fit[0]
+
+            if i_model_balance[0] < global_best_balance:
+                global_best_balance = i_model_balance[0]
+
+
+        print('re-training best model on all the data using best model parameter...')
+        print('best model parameter:', best_model_params)
+        best_model = lstm.LSTMModel(**best_model_params)
+        if args.cuda:
+            best_model = best_model.to('cuda')
+        print(best_model)
+        hidden_size, lr, weight_decay, batch_size = best_hyper_paras
+        optimizer = torch.optim.Adam(best_model.parameters(), lr=lr, weight_decay=weight_decay)
+        all_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                      sampler=SubsetRandomSampler(indices))
+        best_model, epoch_losses_ipw = lstm.lstm_fit(best_model, optimizer, args.epochs, all_data_loader, args.cuda)
+        save_model(best_model, args.save_model_filename, model_params=best_model_params)
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'ipara', 'epoch', 'paras'] + \
-                   [pre + x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
+        col_name = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['test_', 'all_'] for x in name]
         results = pd.DataFrame(results, columns=col_name)
-
-        print('Model selection finished! Save Global Best PSModel at Hyper-iter [{}/{}], Epoch: {}'.format(
-            i, len(hyper_paras_list), best_model_epoch), 'trainval-balance:', best_balance, 'val-auc:', best_auc,
-            'global_best_balance:', global_best_balance, 'global_best_auc:', global_best_auc)
-
-        print(hyper_paras_names)
-        print(best_hyper_paras)
+        results['paras_str'] = results['paras'].apply(lambda x: str(x))
+        results_agg = results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(
+            by=[('i', 'mean')])
+        results_agg.columns = results_agg.columns.to_flat_index()
 
         results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
-        results_all_list, results_all_df = final_eval_deep(lstm.LSTMModel, args, train_loader, val_loader, test_loader,
+        results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
+
+        results_all_list, results_all_df = final_eval_deep_cv_revise(lstm.LSTMModel, args, train_loader, val_loader, test_loader,
                                                            data_loader,
                                                            drug_name, feature_name, n_feature,
                                                            dump_ori=False, lstm=True)

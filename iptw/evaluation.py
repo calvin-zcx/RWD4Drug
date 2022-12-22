@@ -39,7 +39,7 @@ def transfer_data_lstm(model, dataloader, cuda=True):
                 logits_t = treatment_logits.to('cpu').detach().data.numpy()
                 labels_t = treatment.to('cpu').detach().data.numpy()
                 original = original.to('cpu').detach().data.numpy()
-                #labels_o = outcome.to('cpu').detach().data.numpy()
+                # labels_o = outcome.to('cpu').detach().data.numpy()
             else:
                 logits_t = treatment_logits.detach().data.numpy()
                 labels_t = treatment.detach().data.numpy()
@@ -272,12 +272,91 @@ def final_eval_deep(model_class, args, train_loader, val_loader, test_loader, da
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI', 'HR_IPTW', 'HR_IPTW_CI',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI',
+                                                       'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
                                                        'unbalance_feature', 'unbalance_feature_IPTW'],
                                               index=['train', 'val', 'test', 'all'])
+
+    # SMD_ALL = (max_smd, smd, n_unbalanced_feature, max_smd_weighted, smd_w, n_unbalanced_feature_w)
+    print('Unbalanced features SMD:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
+          np.where(SMD_ALL[1] > SMD_THRESHOLD)[0])
+    print('Unbalanced features SMD value:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
+          SMD_ALL[1][SMD_ALL[1] > SMD_THRESHOLD])
+    print('Unbalanced features SMD names:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
+          feature_name[np.where(SMD_ALL[1] > SMD_THRESHOLD)[0]])
+    print('Unbalanced features IPTW-SMD:\n', SMD_ALL[5], '{:2f}%'.format(SMD_ALL[5] * 100. / len(SMD_ALL[4])),
+          np.where(SMD_ALL[4] > SMD_THRESHOLD)[0])
+    print('Unbalanced features IPTW-SMD value:\n', SMD_ALL[5], '{:2f}%'.format(SMD_ALL[5] * 100. / len(SMD_ALL[4])),
+          SMD_ALL[4][SMD_ALL[4] > SMD_THRESHOLD])
+    print('Unbalanced features IPTW-SMD names:\n', SMD_ALL[5], '{:2f}%'.format(SMD_ALL[5] * 100. / len(SMD_ALL[4])),
+          feature_name[np.where(SMD_ALL[4] > SMD_THRESHOLD)[0]])
+
+    results_train_val_test_all.to_csv(args.save_model_filename + '_results.csv')
+    print('Dump to ', args.save_model_filename + '_results.csv')
+    if dump_ori:
+        with open(args.save_model_filename + '_results.pt', 'wb') as f:
+            pickle.dump(results_all_list + [feature_name, ], f)  #
+            print('Dump to ', args.save_model_filename + '_results.pt')
+
+    return results_all_list, results_train_val_test_all
+
+
+def final_eval_deep_cv_revise(model_class, args, train_loader, val_loader, test_loader, data_loader,
+                              drug_name, feature_name, n_feature, dump_ori=True, lstm=False):
+    mymodel = load_model(model_class, args.save_model_filename)
+    mymodel.to(args.device)
+
+    print("*****" * 5, 'Evaluation on ALL data:')
+    IPTW_ALL, AUC_ALL, SMD_ALL, ATE_ALL, KM_ALL = model_eval_deep(
+        mymodel, data_loader, verbose=1, normalized=False, cuda=args.cuda,
+        figsave=args.save_model_filename + '_all', lstm=lstm)
+
+    results_train_val_test_all = []
+    results_all_list = [
+        # (train_IPTW_ALL, train_AUC_ALL, train_SMD_ALL, train_ATE_ALL, train_KM_ALL),
+        # (val_IPTW_ALL, val_AUC_ALL, val_SMD_ALL, val_ATE_ALL, val_KM_ALL),
+        # (test_IPTW_ALL, test_AUC_ALL, test_SMD_ALL, test_ATE_ALL, test_KM_ALL),
+        (IPTW_ALL, AUC_ALL, SMD_ALL, ATE_ALL, KM_ALL)
+    ]
+    for tw, tauc, tsmd, tate, tkm in results_all_list:
+        results_train_val_test_all.append(
+            [args.treated_drug, drug_name[args.treated_drug], tw[7], tw[8],
+             tw[0], tauc[0], tauc[1], tauc[2], tauc[3],
+             tsmd[0], tsmd[3], tsmd[2], tsmd[5],
+             n_feature, (tsmd[1] >= 0).sum(),
+             *tate,
+             [180, 365, 540, 730],
+             tkm[0][3], tkm[0][4], tkm[0][2], tkm[0][5].p_value,
+             tkm[1][3], tkm[1][4], tkm[1][2], tkm[1][5].p_value,
+             tkm[2][0], tkm[2][1], tkm[2][2].summary.p.treatment if pd.notna(tkm[2][2]) else np.nan,
+             tkm[3][0], tkm[3][1], tkm[3][2].summary.p.treatment if pd.notna(tkm[3][2]) else np.nan,
+             tw[1].sum(), tw[2].sum(),
+             tw[3], tw[4], tw[5], tw[6],
+             ';'.join(feature_name[np.where(tsmd[1] > SMD_THRESHOLD)[0]]),
+             ';'.join(feature_name[np.where(tsmd[4] > SMD_THRESHOLD)[0]])
+             ])
+    results_train_val_test_all = pd.DataFrame(results_train_val_test_all,
+                                              columns=['drug', 'name', 'n_treat', 'n_ctrl',
+                                                       'loss', 'AUC', 'AUC_IPTW', 'AUC_expected', 'AUC_diff',
+                                                       'max_unbalanced_original', 'max_unbalanced_weighted',
+                                                       'n_unbalanced_feature', 'n_unbalanced_feature_IPTW',
+                                                       'n_feature', 'n_feature_nonzero',
+                                                       'EY1_original', 'EY0_original', 'ATE_original',
+                                                       'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
+                                                       'KM_time_points',
+                                                       'KM1_original', 'KM0_original', 'KM1-0_original',
+                                                       'KM1-0_original_p',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'KM1-0_IPTW_p',
+                                                       'HR_ori', 'HR_ori_CI', 'HR_ori_p',
+                                                       'HR_IPTW', 'HR_IPTW_CI', 'HR_IPTW_p',
+                                                       'n_treat_IPTW', 'n_ctrl_IPTW',
+                                                       'treat_IPTW_stats', 'ctrl_IPTW_stats',
+                                                       'treat_PS_stats', 'ctrl_PS_stats',
+                                                       'unbalance_feature', 'unbalance_feature_IPTW'],
+                                              index=['all'])  # 'train', 'val', 'test',
 
     # SMD_ALL = (max_smd, smd, n_unbalanced_feature, max_smd_weighted, smd_w, n_unbalanced_feature_w)
     print('Unbalanced features SMD:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
@@ -360,7 +439,8 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
                                                        'KM1_original', 'KM0_original', 'KM1-0_original',
-                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI', 'HR_IPTW', 'HR_IPTW_CI',
+                                                       'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'HR_ori', 'HR_ori_CI',
+                                                       'HR_IPTW', 'HR_IPTW_CI',
                                                        'n_treat_IPTW', 'n_ctrl_IPTW',
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
@@ -390,10 +470,10 @@ def final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y, t
 
     return results_all_list, results_train_val_test_all
 
+
 def final_eval_ml_CV_revise(model, args, x, t, y, drug_name, feature_name, n_feature, dump_ori=True):
     # ----. Model Evaluation & Final ATE results
     # model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1, figsave='', report=5)
-
 
     print("*****" * 5, 'Evaluation on ALL data:')
     IPTW_ALL, AUC_ALL, SMD_ALL, ATE_ALL, KM_ALL = model_eval_common(
@@ -433,7 +513,8 @@ def final_eval_ml_CV_revise(model, args, x, t, y, drug_name, feature_name, n_fea
                                                        'EY1_original', 'EY0_original', 'ATE_original',
                                                        'EY1_IPTW', 'EY0_IPTW', 'ATE_IPTW',
                                                        'KM_time_points',
-                                                       'KM1_original', 'KM0_original', 'KM1-0_original', 'KM1-0_original_p',
+                                                       'KM1_original', 'KM0_original', 'KM1-0_original',
+                                                       'KM1-0_original_p',
                                                        'KM1_IPTW', 'KM0_IPTW', 'KM1-0_IPTW', 'KM1-0_IPTW_p',
                                                        'HR_ori', 'HR_ori_CI', 'HR_ori_p',
                                                        'HR_IPTW', 'HR_IPTW_CI', 'HR_IPTW_p',
@@ -441,7 +522,7 @@ def final_eval_ml_CV_revise(model, args, x, t, y, drug_name, feature_name, n_fea
                                                        'treat_IPTW_stats', 'ctrl_IPTW_stats',
                                                        'treat_PS_stats', 'ctrl_PS_stats',
                                                        'unbalance_feature', 'unbalance_feature_IPTW'],
-                                              index=['all']) # 'train', 'val', 'test',
+                                              index=['all'])  # 'train', 'val', 'test',
 
     # SMD_ALL = (max_smd, smd, n_unbalanced_feature, max_smd_weighted, smd_w, n_unbalanced_feature_w)
     print('Unbalanced features SMD:\n', SMD_ALL[2], '{:2f}%'.format(SMD_ALL[2] * 100. / len(SMD_ALL[1])),
@@ -465,6 +546,7 @@ def final_eval_ml_CV_revise(model, args, x, t, y, drug_name, feature_name, n_fea
             print('Dump to ', args.save_model_filename + '_results.pt')
 
     return results_all_list, results_train_val_test_all
+
 
 # %%  Aux-functions
 def logits_to_probability(logits, normalized):
@@ -512,11 +594,11 @@ def cal_weights(golds_treatment, logits_treatment, normalized, stabilized=True, 
     if stabilized:
         # stabilized weights:   treated_w.sum() + controlled_w.sum() ~ N
         treated_w, controlled_w = p_T / logits_treatment[ones_idx], (1 - p_T) / (
-                    1. - logits_treatment[zeros_idx])  # why *p_T here?
+                1. - logits_treatment[zeros_idx])  # why *p_T here?
     else:
         # standard IPTW:  treated_w.sum() + controlled_w.sum() > N
         treated_w, controlled_w = 1. / logits_treatment[ones_idx], 1. / (
-                    1. - logits_treatment[zeros_idx])  # why *p_T here? my added test
+                1. - logits_treatment[zeros_idx])  # why *p_T here? my added test
 
     if clip:
         # treated_w = np.clip(treated_w, a_min=1e-06, a_max=50)
@@ -670,11 +752,11 @@ def cal_survival_KM(golds_treatment, logits_treatment, golds_outcome, normalized
     # cox for hazard ratio
     cph = CoxPHFitter()
     event = golds_outcome[:, 0]
-    event[event==-1] = 0
+    event[event == -1] = 0
     weight = np.zeros(len(golds_treatment))
     weight[ones_idx] = treated_w.squeeze()
     weight[zeros_idx] = controlled_w.squeeze()
-    cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights':weight})
+    cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights': weight})
     try:
         cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
         HR = cph.hazard_ratios_['treatment']
@@ -690,6 +772,6 @@ def cal_survival_KM(golds_treatment, logits_treatment, golds_outcome, normalized
         cph_ori = HR_ori = CI_ori = None
 
     return (kmf1, kmf0, ate, survival_1, survival_0, results), \
-           (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w), \
-           (HR_ori, CI_ori, cph_ori), \
-           (HR, CI, cph)
+        (kmf1_w, kmf0_w, ate_w, survival_1_w, survival_0_w, results_w), \
+        (HR_ori, CI_ori, cph_ori), \
+        (HR, CI, cph)

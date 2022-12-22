@@ -1,5 +1,7 @@
 import torch
-
+import torch.nn.functional as F
+from tqdm import tqdm
+import numpy as np
 
 class LSTMModel(torch.nn.Module):
     def __init__(self, diag_vocab_size, med_vocab_size, diag_embedding_size,
@@ -97,3 +99,34 @@ class LSTMModel(torch.nn.Module):
         outputs_logits_ipw = self.hidden2out_ipw(hidden)  # bs * hidden3 --> bs * 1
 
         return outputs_logits_ipw.view(outputs_logits_ipw.size(0)), original
+
+
+def lstm_fit(model, optimizer, epochs, train_loader_shuffled, cuda):
+    for epoch in tqdm(range(epochs)):
+        epoch_losses_ipw = []
+        for confounder, treatment, outcome in train_loader_shuffled:
+            model.train()
+            # train IPW
+            optimizer.zero_grad()
+
+            if cuda:  # confounder = (diag, med, sex, age)
+                for ii in range(len(confounder)):
+                    confounder[ii] = confounder[ii].to('cuda')
+                treatment = treatment.to('cuda')
+
+            treatment_logits, _ = model(confounder)
+            loss_ipw = F.binary_cross_entropy_with_logits(treatment_logits, treatment.float())
+
+            loss_ipw.backward()
+            optimizer.step()
+            epoch_losses_ipw.append(loss_ipw.item())
+
+        # just finish 1 epoch
+        # scheduler.step()
+        epoch_losses_ipw = np.mean(epoch_losses_ipw)
+
+        print('epoch:{}, loss:{}'.format(epoch, epoch_losses_ipw))
+
+    return model, epoch_losses_ipw
+
+# def lstm_cross_validation_fit(dataset, indices, kfold=10, verbose=1, shuffle=True):
