@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 from ipreprocess.utils import load_icd_to_ccw
 from PSModels import mlp, lstm, ml
 import itertools
+from tqdm import tqdm
+
 import functools
 print = functools.partial(print, flush=True)
 
@@ -24,13 +26,13 @@ print = functools.partial(print, flush=True)
 def parse_args():
     parser = argparse.ArgumentParser(description='process parameters')
     # Input
-    parser.add_argument('--data_dir', type=str, default='../ipreprocess/output/save_cohort_all/')
+    parser.add_argument('--data_dir', type=str, default='../ipreprocess/output/save_cohort_all_loose/')
     parser.add_argument('--treated_drug', type=str)
     parser.add_argument('--controlled_drug', choices=['atc', 'random'], default='random')
     parser.add_argument('--controlled_drug_ratio', type=int, default=3)  # 2 seems not good. keep unchanged
     parser.add_argument("--random_seed", type=int, default=0)
 
-    parser.add_argument('--run_model', choices=['LSTM', 'LR', 'MLP', 'XGBOOST', 'LIGHTGBM'], default='MLP')
+    parser.add_argument('--run_model', choices=['LSTM', 'LR', 'MLP', 'XGBOOST', 'LIGHTGBM'], default='LR')
     parser.add_argument('--med_code_topk', type=int, default=200)
     parser.add_argument('--drug_coding', choices=['rxnorm', 'gpi'], default='rxnorm')
     parser.add_argument('--stats', action='store_true')
@@ -49,7 +51,7 @@ def parse_args():
     # MLP
     parser.add_argument('--hidden_size', type=str, default='', help=', delimited integers')
     # Output
-    parser.add_argument('--output_dir', type=str, default='output/')
+    parser.add_argument('--output_dir', type=str, default='output/debug/')
 
     # discarded
     # parser.add_argument('--save_db', type=str)
@@ -87,8 +89,9 @@ def parse_args():
 # flaten series into static
 # train_x, train_t, train_y = flatten_data(my_dataset, train_indices)  # (1764,713), (1764,), (1764,)
 def flatten_data(mdata, data_indices, verbose=1):
+    print('flatten_data...')
     x, t, y = [], [], []
-    for idx in data_indices:
+    for idx in tqdm(data_indices):
         confounder, treatment, outcome = mdata[idx][0], mdata[idx][1], mdata[idx][2]
         dx, rx, sex, age, days = confounder[0], confounder[1], confounder[2], confounder[3], confounder[4]
         dx, rx = np.sum(dx, axis=0), np.sum(rx, axis=0)
@@ -154,10 +157,13 @@ if __name__ == "__main__":
             for key, val in gpiing_names_cnt.items():
                 drug_name[key] = '/'.join(val[0])
         print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
+        print('trial drug:', args.treated_drug, drug_name.get(args.treated_drug))
+
     else:
         with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
             drug_name = pickle.load(f)
             print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
+            print('trial drug:', args.treated_drug, drug_name.get(args.treated_drug))
     # Load diagnosis code mapping
     icd_to_ccw, icd_to_ccwname, ccw_info = load_icd_to_ccw('../ipreprocess/mapping/CCW_to_use_enriched.json')
     dx_name = ccw_info[1]
@@ -298,7 +304,8 @@ if __name__ == "__main__":
 
     n_user, n_nonuser = len(treated), len(controlled_sample)
     print('#treated: {}, #controls: {}'.format(n_user, n_nonuser),
-          '(Warning: the args.controlled_drug_ratio is {},'
+          '\nactual control/treated:', n_nonuser/n_user,
+          '\n(Warning: the args.controlled_drug_ratio is {},'
           ' and the atc control cohort may have less patients than expected)'.format(args.controlled_drug_ratio))
 
     # 1-B: calculate the statistics of treated v.s. control
@@ -550,15 +557,14 @@ if __name__ == "__main__":
     # %% Logistic regression PS PSModels
     if args.run_model in ['LR', 'XGBOOST', 'LIGHTGBM']:
         print("**************************************************")
-        print("**************************************************")
         print(args.run_model, ' PS model learning:')
 
-        print('Train data:')
-        train_x, train_t, train_y = flatten_data(my_dataset, train_indices)
-        print('Validation data:')
-        val_x, val_t, val_y = flatten_data(my_dataset, val_indices)
-        print('Test data:')
-        test_x, test_t, test_y = flatten_data(my_dataset, test_indices)
+        # print('Train data:')
+        # train_x, train_t, train_y = flatten_data(my_dataset, train_indices)
+        # print('Validation data:')
+        # val_x, val_t, val_y = flatten_data(my_dataset, val_indices)
+        # print('Test data:')
+        # test_x, test_t, test_y = flatten_data(my_dataset, test_indices)
         print('All data:')
         x, t, y = flatten_data(my_dataset, indices)  # all the data
 
@@ -566,7 +572,7 @@ if __name__ == "__main__":
         if args.run_model == 'LR':
             paras_grid = {
                 'penalty': ['l1', 'l2'],
-                'C': 10 ** np.arange(-3, 3, 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+                'C': 10 ** np.arange(-3, 3, 0.5), #0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
                 'max_iter': [200],  # [100, 200, 500],
                 'random_state': [args.random_seed],
             }
@@ -591,17 +597,23 @@ if __name__ == "__main__":
 
         # ----2. Learning IPW using PropensityEstimator
         # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
-        model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
-                                                                                test_t)
+        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
+        #                                                                         test_t)
+
+        model = ml.PropensityEstimator(args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit(
+            x, t, verbose=0)
 
         with open(args.save_model_filename, 'wb') as f:
             pickle.dump(model, f)
 
         model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
+        model.results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
         # ----3. Evaluation learned PropensityEstimator
-        results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
-                                                         test_x, test_t, test_y, x, t, y,
-                                                         drug_name, feature_name, n_feature, dump_ori=False)
+        # results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
+        #                                                  test_x, test_t, test_y, x, t, y,
+        #                                                  drug_name, feature_name, n_feature, dump_ori=False)
+        results_all_list, results_all_df = final_eval_ml_CV_revise(model, args,  x, t, y,
+                                                                   drug_name, feature_name, n_feature, dump_ori=False)
 
     # %%  MLP PS Models
     if args.run_model == 'MLP':

@@ -5,6 +5,7 @@ from vocab import *
 from tqdm import tqdm
 
 # logger = logging.getLogger()
+DEBUG = False
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -65,6 +66,17 @@ class Dataset(torch.utils.data.Dataset):
         # logger.info('Medication Visit Max Length: %d' % self.med_visit_max_length)
         print('Diagnoses Visit Max Length: %d' % self.diag_visit_max_length)
         print('Medication Visit Max Length: %d' % self.med_visit_max_length)
+
+        if DEBUG:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            import pandas as pd
+            data_debug = pd.DataFrame(
+                data={'treatment': self.treatment, 'age': self.ages, 'sex': self.sexes, 'days': self.days_since_initial})
+            sns.histplot(data=data_debug, x='days', hue='treatment', kde=True, bins=25, stat="percent", common_norm=False)
+            # sns.histplot(data=data_debug.loc[data_debug['treatment'] == 1, 'age'], kde=True, bins=25, stat="percent")
+            # sns.histplot(data=data_debug.loc[data_debug['treatment'] == 0, 'age'], kde=True, bins=25, stat="percent")
+            plt.show()
 
         # self.ages=np.abs(self.ages-np.mean(self.ages))/np.var(self.ages)
         self.ages = (self.ages - np.min(self.ages)) / np.ptp(self.ages)

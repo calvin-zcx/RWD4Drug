@@ -10,17 +10,19 @@ from sklearn.ensemble import AdaBoostClassifier
 import numpy as np
 import itertools
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import KFold
 import time
 from sklearn.metrics import log_loss
 from tqdm import tqdm
 import xgboost as xgb
 import lightgbm as lgb
-from iptw.evaluation import cal_deviation, SMD_THRESHOLD
+from iptw.evaluation import cal_deviation, SMD_THRESHOLD, cal_weights
 
 
 class PropensityEstimator:
-    def __init__(self, learner, paras_grid=None):
+    def __init__(self, learner, paras_grid=None, random_seed=0):
         self.learner = learner
+        self.random_seed = random_seed
         assert self.learner in ('LR', 'XGBOOST', 'LIGHTGBM')
 
         if (paras_grid is None) or (not paras_grid) or (not isinstance(paras_grid, dict)):
@@ -28,7 +30,7 @@ class PropensityEstimator:
         else:
             self.paras_grid = {k: v for k, v in paras_grid.items()}
             for k, v in self.paras_grid.items():
-                if isinstance(v, str):
+                if isinstance(v, str) or not isinstance(v, (list, set, np.ndarray, pd.Series)):
                     print(k, v, 'is a fixed parameter')
                     self.paras_grid[k] = [v, ]
 
@@ -37,6 +39,11 @@ class PropensityEstimator:
             paras_list = list(itertools.product(*paras_v))
             self.paras_names = paras_names
             self.paras_list = [{self.paras_names[i]: para[i] for i in range(len(para))} for para in paras_list]
+            if self.learner == 'LR':
+                no_penalty_case = {'penalty': 'none', 'max_iter': 200, 'random_state': random_seed}
+                if (no_penalty_case not in self.paras_list) and (len(self.paras_list) > 1):
+                    self.paras_list.append(no_penalty_case)
+                    print('Add no penalty case to logistic regression model:', no_penalty_case)
         else:
             self.paras_names = []
             self.paras_list = [{}]
@@ -49,6 +56,9 @@ class PropensityEstimator:
 
         self.global_best_val = float('-inf')
         self.global_best_balance = float('inf')
+
+        self.best_balance_k_folds_detail = []  # k #(SMD>threshold)
+        self.best_val_k_folds_detail = []  # k AUC
 
         self.results = []
 
@@ -180,6 +190,108 @@ class PropensityEstimator:
         if verbose:
             self.report_stats()
         print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+        return self
+
+    def _model_estimation(self, para_d, X_train, T_train):
+        # model estimation on training data
+        if self.learner == 'LR':
+            if para_d.get('penalty', '') == 'l1':
+                para_d['solver'] = 'liblinear'
+            else:
+                para_d['solver'] = 'lbfgs'
+            model = LogisticRegression(**para_d).fit(X_train, T_train)
+        elif self.learner == 'LIGHTGBM':
+            model = lgb.LGBMClassifier(**para_d).fit(X_train, T_train)
+        # elif learner == 'SVM':
+        #   model = svm.SVC().fit(confounder, treatment)
+        # elif learner == 'CART':
+        #   model = tree.DecisionTreeClassifier(max_depth=6).fit(confounder, treatment)
+        else:
+            raise ValueError
+
+        return model
+
+    def cross_validation_fit(self, X, T, kfold=10, verbose=1, shuffle=True):
+        start_time = time.time()
+        kf = KFold(n_splits=kfold, random_state=self.random_seed, shuffle=shuffle)
+        if verbose:
+            print('Model {} Searching Space N={} by '
+                  '{}-k-fold cross validation: '.format(self.learner,
+                                                        len(self.paras_list),
+                                                        kf.get_n_splits()), self.paras_grid)
+        # For each model in model space, do cross-validation training and testing,
+        # performance of a model is average (std) over K cross-validated datasets
+        # select best model with the best average K-cross-validated performance
+        X = np.asarray(X)
+        T = np.asarray(T)
+        for i, para_d in tqdm(enumerate(self.paras_list, 1), total=len(self.paras_list)):
+            i_model_balance_over_kfold = []
+            i_model_fit_over_kfold = []
+            for k, (train_index, test_index) in enumerate(kf.split(X), 1):
+                print('Training {}th (/{}) model {} over the {}th-fold data'.format(i, len(self.paras_list), para_d, k))
+                # training and testing datasets:
+                X_train = X[train_index, :]
+                T_train = T[train_index]
+                X_test = X[test_index, :]
+                T_test = T[test_index]
+
+                # model estimation on training data
+                model = self._model_estimation(para_d, X_train, T_train)
+
+                # propensity scores on training and testing datasets
+                T_train_pre = model.predict_proba(X_train)[:, 1]
+                T_test_pre = model.predict_proba(X_test)[:, 1]
+
+                # evaluating goodness-of-balance and goodness-of-fit
+                # result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
+                result_test = self._evaluation_helper(X_test, T_test, T_test_pre)
+                result_all = self._evaluation_helper(
+                    np.concatenate((X_train, X_test)),
+                    np.concatenate((T_train, T_test)),
+                    np.concatenate((T_train_pre, T_test_pre))
+                )# (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
+                i_model_balance_over_kfold.append(result_all[5])
+                i_model_fit_over_kfold.append(result_test[1])
+
+                self.results.append((i, k, para_d) + result_test + result_all)
+                # end of one fold
+
+            i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
+            i_model_fit = [np.mean(i_model_fit_over_kfold), np.std(i_model_fit_over_kfold)]
+
+            if (i_model_balance[0] < self.best_balance) or \
+                    ((i_model_balance[0] == self.best_balance) and (i_model_fit[0] > self.best_val)):
+                # model with current best configuration re-trained on the whole dataset.
+                # self.best_model = self._model_estimation(para_d, X, T)
+                self.best_hyper_paras = para_d
+                self.best_balance = i_model_balance[0]
+                self.best_val = i_model_fit[0]
+                self.best_balance_k_folds_detail = i_model_balance_over_kfold
+                self.best_val_k_folds_detail = i_model_fit_over_kfold
+
+            if i_model_fit[0] > self.global_best_val:
+                self.global_best_val = i_model_fit[0]
+
+            if i_model_balance[0] < self.global_best_balance:
+                self.global_best_balance = i_model_balance[0]
+
+            if verbose:
+                self.report_stats()
+        # end of training
+        print('best model parameter:', self.best_hyper_paras)
+        print('re-training best model on all the data using best model parameter...')
+        self.best_model = self._model_estimation(self.best_hyper_paras, X, T)
+        name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
+        col_name = ['i', 'fold-k', 'paras'] + [pre + x for pre in ['test_', 'all_'] for x in name]
+        self.results = pd.DataFrame(self.results, columns=col_name)
+        self.results['paras_str'] = self.results['paras'].apply(lambda x: str(x))
+        self.results_agg = self.results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(by=[('i', 'mean')])
+        self.results_agg.columns = self.results_agg.columns.to_flat_index()
+
+        if verbose:
+            self.report_stats()
+        print('Fit Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+
         return self
 
     def report_stats(self):
