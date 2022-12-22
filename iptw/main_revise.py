@@ -603,8 +603,8 @@ if __name__ == "__main__":
         model = ml.PropensityEstimator(args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit(
             x, t, verbose=0)
 
-        with open(args.save_model_filename, 'wb') as f:
-            pickle.dump(model, f)
+        # with open(args.save_model_filename, 'wb') as f:
+        #     pickle.dump(model, f)
 
         model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         model.results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
