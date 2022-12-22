@@ -142,10 +142,12 @@ if __name__ == "__main__":
     print('args: ', args)
     print('SMD_THRESHOLD: ', SMD_THRESHOLD)
     print('random_seed: ', args.random_seed)
-    print('device: ', args.device)
     print('Drug {} cohort: '.format(args.treated_drug))
     print('save_model_filename', args.save_model_filename)
 
+    print('device: ', args.device)
+    print('torch.cuda.device_count():', torch.cuda.device_count())
+    print('torch.cuda.current_device():', torch.cuda.current_device())
     # %% 1. Load Data
     ## load drug code name mapping
     if args.drug_coding.lower() == 'gpi':
