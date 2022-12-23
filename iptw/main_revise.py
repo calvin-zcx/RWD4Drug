@@ -413,7 +413,7 @@ if __name__ == "__main__":
         #     'batch_size': [50],  # 50 # default as baseline work
         # }
         paras_grid = {
-            'hidden_size': [32, 64, 128],  # [32, 64, 100, 128],  # 100
+            'hidden_size': [128, 64, 32],  # [32, 64, 100, 128],  # 100
             'lr': [1e-3],
             'weight_decay': [1e-4, 1e-5, 1e-6],
             'batch_size': [100],  # 50 # default as baseline work
