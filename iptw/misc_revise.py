@@ -328,11 +328,22 @@ def split_shell_file(fname, divide=2, skip_first=1):
     print('dump done')
 
 
+def _simplify_col_(x):
+    if 'mean' in x:
+        x = x.replace(r"', 'mean')", '').replace(r"('", '')
+    elif 'std' in x:
+        x = x.replace(r"', 'std')", '').replace(r"('", '') + '-std'
+    else:
+        x = x.replace(r"', '')", '').replace(r"('", '')
+    return x
+
+
+
 def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -343,9 +354,9 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
-                    df = pd.read_csv(fname + '_ALL-model-select.csv')
+                    df = pd.read_csv(fname + '_ALL-model-select-agg.csv')
                 except:
-                    print('No file exisits: ', fname + '_ALL-model-select.csv')
+                    print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
 
                 # 1. selected by AUC
                 dftmp = df.sort_values(by=['val_auc', 'i'], ascending=[False, True])
@@ -2040,13 +2051,13 @@ if __name__ == '__main__':
     # split_shell_file("revise_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
 
     #
-    df_drug = pd.read_excel(
-        r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
-        'all', dtype={'drug':str})
-    drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
-
-    shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False)
-    split_shell_file("revise_shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
+    # df_drug = pd.read_excel(
+    #     r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
+    #     'all', dtype={'drug':str})
+    # drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
+    #
+    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False)
+    # split_shell_file("revise_shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
 
     # return 1
 

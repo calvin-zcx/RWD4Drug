@@ -61,6 +61,8 @@ class PropensityEstimator:
         self.best_val_k_folds_detail = []  # k AUC
 
         self.results = []
+        self.results_retrain = []
+        self.results_agg = []
 
     @staticmethod
     def _evaluation_helper(X, T, T_pre):
@@ -243,7 +245,7 @@ class PropensityEstimator:
                 T_test_pre = model.predict_proba(X_test)[:, 1]
 
                 # evaluating goodness-of-balance and goodness-of-fit
-                # result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
+                result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
                 result_test = self._evaluation_helper(X_test, T_test, T_test_pre)
                 result_all = self._evaluation_helper(
                     np.concatenate((X_train, X_test)),
@@ -253,7 +255,7 @@ class PropensityEstimator:
                 i_model_balance_over_kfold.append(result_all[5])
                 i_model_fit_over_kfold.append(result_test[1])
 
-                self.results.append((i, k, para_d) + result_test + result_all)
+                self.results.append((i, k, para_d) + result_train + result_test + result_all)
                 # end of one fold
 
             i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
@@ -275,18 +277,32 @@ class PropensityEstimator:
             if i_model_balance[0] < self.global_best_balance:
                 self.global_best_balance = i_model_balance[0]
 
+            # save re-trained results on the whole data, for model selection exp only. Not necessary for later use
+            model_retrain = self._model_estimation(para_d, X, T)
+            T_pre = model_retrain.predict_proba(X)[:, 1]
+            result_retrain = self._evaluation_helper(X, T, T_pre)
+            self.results_retrain.append((i, 'retrain', para_d) + result_retrain)
+
             if verbose:
                 self.report_stats()
+
         # end of training
         print('best model parameter:', self.best_hyper_paras)
         print('re-training best model on all the data using best model parameter...')
         self.best_model = self._model_estimation(self.best_hyper_paras, X, T)
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'fold-k', 'paras'] + [pre + x for pre in ['test_', 'all_'] for x in name]
+        col_name = ['i', 'fold-k', 'paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain all_'] for x in name]
         self.results = pd.DataFrame(self.results, columns=col_name)
         self.results['paras_str'] = self.results['paras'].apply(lambda x: str(x))
-        self.results_agg = self.results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(by=[('i', 'mean')])
-        self.results_agg.columns = self.results_agg.columns.to_flat_index()
+
+        col_name_retrain = ['i', 'fold-k', 'paras'] + [pre + x for pre in ['all_'] for x in name]
+        self.results_retrain = pd.DataFrame(self.results_retrain, columns=col_name_retrain)
+        self.results_retrain['paras_str'] = self.results_retrain['paras'].apply(lambda x: str(x))
+
+        results_agg = self.results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(by=[('i', 'mean')])
+        results_agg.columns = results_agg.columns.to_flat_index()
+        results_agg.columns = results_agg.columns.map('-'.join)
+        self.results_agg = pd.merge(results_agg, self.results_retrain, left_on='paras_str-', right_on='paras_str', how='left')
 
         if verbose:
             self.report_stats()
