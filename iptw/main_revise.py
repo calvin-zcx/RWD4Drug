@@ -413,9 +413,9 @@ if __name__ == "__main__":
         #     'batch_size': [50],  # 50 # default as baseline work
         # }
         paras_grid = {
-            'hidden_size': [128, 64, 32],  # [32, 64, 100, 128],  # 100
+            'hidden_size': [256],  # [32, 64, 100, 128],  # 100  , 128, 64
             'lr': [1e-3],
-            'weight_decay': [1e-4, 1e-5, 1e-6],
+            'weight_decay': [1e-4], # , 1e-5, 1e-6
             'batch_size': [100],  # 50 # default as baseline work
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
@@ -431,6 +431,7 @@ if __name__ == "__main__":
         global_best_balance = float('inf')
         best_model_epoch = -1
         results = []
+        results_retrain = []
         i_iter = -1
         kfold = 10
 
@@ -496,7 +497,6 @@ if __name__ == "__main__":
 
                 n_train = len(X_train)
                 n_test = len(X_test)
-
                 result_all = _evaluation_helper(
                     np.concatenate((X_train, X_test)),
                     np.concatenate((T_train, T_test)),
@@ -507,7 +507,7 @@ if __name__ == "__main__":
                 i_model_balance_over_kfold.append(result_all[5])
                 i_model_fit_over_kfold.append(result_test[1])
 
-                results.append((i, k, hyper_paras, model_params) + result_test + result_all)
+                results.append((i, k, hyper_paras, model_params) + result_train + result_test + result_all)
 
             i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
             i_model_fit = [np.mean(i_model_fit_over_kfold), np.std(i_model_fit_over_kfold)]
@@ -533,6 +533,20 @@ if __name__ == "__main__":
             if i_model_balance[0] < global_best_balance:
                 global_best_balance = i_model_balance[0]
 
+            # save re-trained results on the whole data, for model selection exp only. Not necessary for later use
+            model_retrain = lstm.LSTMModel(**model_params)
+            if args.cuda:
+                model_retrain = model_retrain.to('cuda')
+            optimizer_retrain = torch.optim.Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
+            all_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                          sampler=SubsetRandomSampler(indices))
+            model_retrain, epoch_losses_ipw = lstm.lstm_fit(model_retrain, optimizer_retrain, args.epochs, all_data_loader, args.cuda)
+            loss_retrain, T_retrain, PS_logits_retrain, Y_retrain, X_retrain = transfer_data_lstm(
+                model_retrain, all_data_loader, cuda=args.cuda)
+            # (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
+            result_retrain = _evaluation_helper(X_retrain, T_retrain, PS_logits_retrain, loss_retrain)
+            results_retrain.append((i, 'retrain', hyper_paras, model_params) + result_retrain)
+            #
 
         print('re-training best model on all the data using best model parameter...')
         print('best model parameter:', best_model_params)
@@ -548,20 +562,26 @@ if __name__ == "__main__":
         save_model(best_model, args.save_model_filename, model_params=best_model_params)
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['test_', 'all_'] for x in name]
+        col_name = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain all_'] for x in name]
         results = pd.DataFrame(results, columns=col_name)
         results['paras_str'] = results['paras'].apply(lambda x: str(x))
+
+        col_name_retrain = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['all_'] for x in name]
+        results_retrain = pd.DataFrame(results_retrain, columns=col_name_retrain)
+        results_retrain['paras_str'] = results_retrain['paras'].apply(lambda x: str(x))
+
         results_agg = results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(
             by=[('i', 'mean')])
         results_agg.columns = results_agg.columns.to_flat_index()
+        results_agg.columns = results_agg.columns.map('-'.join)
+        results_agg = pd.merge(results_agg, results_retrain, left_on='paras_str-', right_on='paras_str', how='left')
+
 
         results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
-
-        results_all_list, results_all_df = final_eval_deep_cv_revise(lstm.LSTMModel, args, train_loader, val_loader, test_loader,
-                                                           data_loader,
-                                                           drug_name, feature_name, n_feature,
-                                                           dump_ori=False, lstm=True)
+        results_all_list, results_all_df = final_eval_deep_cv_revise(
+            lstm.LSTMModel, args, train_loader, val_loader, test_loader,
+            data_loader, drug_name, feature_name, n_feature, dump_ori=False, lstm=True)
 
     # %% Logistic regression PS PSModels
     if args.run_model in ['LR', 'XGBOOST', 'LIGHTGBM']:
