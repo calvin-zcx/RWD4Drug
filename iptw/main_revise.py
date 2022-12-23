@@ -413,9 +413,9 @@ if __name__ == "__main__":
         #     'batch_size': [50],  # 50 # default as baseline work
         # }
         paras_grid = {
-            'hidden_size': [256],  # [32, 64, 100, 128],  # 100  , 128, 64
+            'hidden_size': [256, 128, 64],  # [32, 64, 100, 128],  # 100  , 128, 64
             'lr': [1e-3],
-            'weight_decay': [1e-4], # , 1e-5, 1e-6
+            'weight_decay': [1e-5, 1e-6], # 1e-4, 1e-5, 1e-6
             'batch_size': [100],  # 50 # default as baseline work
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
