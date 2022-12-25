@@ -329,14 +329,17 @@ def split_shell_file(fname, divide=2, skip_first=1):
 
 
 def _simplify_col_(x):
-    if 'mean' in x:
-        x = x.replace(r"', 'mean')", '').replace(r"('", '')
-    elif 'std' in x:
-        x = x.replace(r"', 'std')", '').replace(r"('", '') + '-std'
+    # if 'mean' in x:
+    #     x = x.replace(r"', 'mean')", '').replace(r"('", '')
+    # elif 'std' in x:
+    #     x = x.replace(r"', 'std')", '').replace(r"('", '') + '-std'
+    # else:
+    #     x = x.replace(r"', '')", '').replace(r"('", '')
+    if ('-mean' in x) and (x != 'i-mean'):
+        x = x.replace('-mean', '')
     else:
-        x = x.replace(r"', '')", '').replace(r"('", '')
+        x = x
     return x
-
 
 
 def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
@@ -355,59 +358,68 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
                     df = pd.read_csv(fname + '_ALL-model-select-agg.csv')
+                    df.rename(columns=_simplify_col_, inplace=True)
                 except:
                     print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
 
-                # 1. selected by AUC
+                # 1. selected by validation AUC
                 dftmp = df.sort_values(by=['val_auc', 'i'], ascending=[False, True])
                 val_auc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
                 val_auc_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_auc_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                val_auc_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')] #'test_auc'# change due to our cv setting
 
                 # 2. selected by val_max_smd_iptw
                 dftmp = df.sort_values(by=['val_max_smd_iptw', 'i'], ascending=[True, True])
                 val_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_max_smd_iptw')]
                 val_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                val_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')] # 'test_auc'
 
                 # 3. selected by val_n_unbalanced_feat_iptw
                 dftmp = df.sort_values(by=['val_n_unbalanced_feat_iptw', 'i'], ascending=[True, False])  # [True, True]
                 val_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_n_unbalanced_feat_iptw')]
                 val_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                val_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+
+                # new 4. selected by val_loss
+                dftmp = df.sort_values(by=['val_loss', 'i'], ascending=[True, False])  # [True, True]
+                val_loss = dftmp.iloc[0, dftmp.columns.get_loc('val_loss')]
+                val_loss_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                val_loss_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+
 
                 # 4. selected by train_max_smd_iptw
                 dftmp = df.sort_values(by=['train_max_smd_iptw', 'i'], ascending=[True, True])
                 train_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_max_smd_iptw')]
                 train_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                train_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                train_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
 
                 # 5. selected by train_n_unbalanced_feat_iptw
                 dftmp = df.sort_values(by=['train_n_unbalanced_feat_iptw', 'i'],
                                        ascending=[True, False])  # [True, True]
                 train_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
                 train_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                train_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                train_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
 
-                # 6. selected by trainval_max_smd_iptw
-                dftmp = df.sort_values(by=['trainval_max_smd_iptw', 'i'], ascending=[True, True])
-                trainval_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_max_smd_iptw')]
-                trainval_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                trainval_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
-
-                # 7. selected by trainval_n_unbalanced_feat_iptw
-                dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'i'],
-                                       ascending=[True, False])  # [True, True]
-                trainval_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
-                trainval_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                trainval_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                # # 6. selected by trainval_max_smd_iptw
+                # dftmp = df.sort_values(by=['trainval_max_smd_iptw', 'i'], ascending=[True, True])
+                # trainval_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_max_smd_iptw')]
+                # trainval_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                #
+                # # 7. selected by trainval_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'i'],
+                #                        ascending=[True, False])  # [True, True]
+                # trainval_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
+                # trainval_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
 
                 # 8. FINAL: selected by trainval_n_unbalanced_feat_iptw + val AUC
-                dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
-                trainval_final_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
+                # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
+                dftmp = df.sort_values(by=['beforRetrain all_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
+                trainval_final_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('beforRetrain all_n_unbalanced_feat_iptw')]
                 trainval_final_valauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
                 trainval_final_finalnsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                trainval_final_testnauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                trainval_final_testnauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
 
                 results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type,
                                 val_auc, val_auc_nsmd, val_auc_testauc,
@@ -2049,6 +2061,7 @@ if __name__ == '__main__':
     # 2022-12-22
     # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
     # split_shell_file("revise_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
+    # split_shell_file("revise_testset_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
 
     #
     # df_drug = pd.read_excel(
