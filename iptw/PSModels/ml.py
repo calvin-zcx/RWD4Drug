@@ -385,12 +385,12 @@ class PropensityEstimator:
             if i_model_balance[0] < self.global_best_balance:
                 self.global_best_balance = i_model_balance[0]
 
-            # save re-trained results on the whole data, for model selection exp only. Not necessary for later use
+            # save re-trained results on the whole (training+val) data, for model selection exp only. Not necessary for later use
             model_retrain = self._model_estimation(para_d, X, T)
             T_pre = model_retrain.predict_proba(X)[:, 1]
             result_retrain = self._evaluation_helper(X, T, T_pre)
 
-            # re-trained model on the test data, for model selection exp only. Not necessary for later use
+            # testing model on the test data, for model selection exp only. Not necessary for later use
             T_test_pre = model_retrain.predict_proba(X_test)[:, 1]
             result_test = self._evaluation_helper(X_test, T_test, T_test_pre)
             T_all_pre = model_retrain.predict_proba(X_all)[:, 1]
