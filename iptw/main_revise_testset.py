@@ -2,7 +2,7 @@ import sys
 # for linux env.
 sys.path.insert(0, '..')
 import os
-if os.name == 'nt':
+if os.name == 'posix':
     try:
         from sklearnex import patch_sklearn
         patch_sklearn(["LogisticRegression"])
