@@ -1,10 +1,13 @@
 import sys
+
 # for linux env.
 sys.path.insert(0, '..')
 import os
+
 if os.name == 'posix':
     try:
         from sklearnex import patch_sklearn
+
         patch_sklearn(["LogisticRegression"])
         print('using sklearnex')
     except ModuleNotFoundError as err:
@@ -30,6 +33,7 @@ from tqdm import tqdm
 from sklearn.model_selection import KFold
 
 import functools
+
 print = functools.partial(print, flush=True)
 
 
@@ -48,7 +52,7 @@ def parse_args():
     parser.add_argument('--stats', action='store_true')
     parser.add_argument('--stats_exit', action='store_true')
     # Deep PSModels
-    parser.add_argument('--batch_size', type=int, default=256)  #768)  # 64)
+    parser.add_argument('--batch_size', type=int, default=256)  # 768)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
     parser.add_argument('--weight_decay', type=float, default=1e-6)  # )0001)
     parser.add_argument('--epochs', type=int, default=3)  # 15 #30
@@ -316,7 +320,7 @@ if __name__ == "__main__":
 
     n_user, n_nonuser = len(treated), len(controlled_sample)
     print('#treated: {}, #controls: {}'.format(n_user, n_nonuser),
-          '\nactual control/treated:', n_nonuser/n_user,
+          '\nactual control/treated:', n_nonuser / n_user,
           '\n(Warning: the args.controlled_drug_ratio is {},'
           ' and the atc control cohort may have less patients than expected)'.format(args.controlled_drug_ratio))
 
@@ -416,7 +420,7 @@ if __name__ == "__main__":
         paras_grid = {
             'hidden_size': [256, 128, 64],  # [32, 64, 100, 128],  # 100  , 128, 64
             'lr': [1e-3],
-            'weight_decay': [1e-5, 1e-6], # 1e-4, 1e-5, 1e-6
+            'weight_decay': [1e-5, 1e-6],  # 1e-4, 1e-5, 1e-6
             'batch_size': [100],  # 50 # default as baseline work
         }
         hyper_paras_names, hyper_paras_v = zip(*paras_grid.items())
@@ -467,20 +471,29 @@ if __name__ == "__main__":
             print('resulting model params:', model_params)
 
             kf = KFold(n_splits=kfold, random_state=args.random_seed, shuffle=True)
-            for k, (train_indices, test_indices) in tqdm(enumerate(kf.split(indices), 1)):
-                print('Training {}th (/{}) model {} over the {}th-fold data'.format(i, len(hyper_paras_list), hyper_paras, k))
+            for k, (trainCV_indices, valCV_indices) in tqdm(enumerate(kf.split(train_indices), 1)):
+                print(
+                    'Training {}th (/{}) model {} over the {}th-fold data'.format(i, len(hyper_paras_list), hyper_paras,
+                                                                                  k))
 
-                train_index, test_index = np.asarray(indices)[train_indices], np.asarray(indices)[test_indices]
-                train_sampler = SubsetRandomSampler(train_index)
-                test_sampler = SubsetRandomSampler(test_index)
+                trainCV_index, valCV_index = np.asarray(indices)[trainCV_indices], np.asarray(indices)[valCV_indices]
+                trainCV_sampler = SubsetRandomSampler(trainCV_index)
+                valCV_sampler = SubsetRandomSampler(valCV_index)
 
-                train_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
-                                                           sampler=train_sampler)
-                test_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
-                                                          sampler=test_sampler)
+                trainCV_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                             sampler=trainCV_sampler)
+                valCV_loader = torch.utils.data.DataLoader(my_dataset, batch_size=args.batch_size,
+                                                           sampler=valCV_sampler)
                 if k == 1:
-                    print('len(train_loader): ', len(train_loader), 'train_loader.batch_size: ', train_loader.batch_size)
-                    print('len(test_loader): ', len(test_loader), 'test_loader.batch_size: ', test_loader.batch_size)
+                    print('len(trainCV_loader): ', len(trainCV_loader),
+                          'trainCV_loader.batch_size: ', trainCV_loader.batch_size,
+                          'trainCV_loader.sampler.__len__()', trainCV_loader.sampler.__len__())
+                    print('len(valCV_loader): ', len(valCV_loader),
+                          'valCV_loader.batch_size: ', valCV_loader.batch_size,
+                          'valCV_loader.sampler.__len__()', valCV_loader.sampler.__len__())
+                    print('len(test_loader): ', len(test_loader),
+                          'test_loader.batch_size: ', test_loader.batch_size,
+                          'test_loader.sampler.__len__()', test_loader.sampler.__len__())
 
                 model = lstm.LSTMModel(**model_params)
                 if args.cuda:
@@ -488,27 +501,40 @@ if __name__ == "__main__":
                 # print(model)
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-                model, epoch_losses_ipw = lstm.lstm_fit(model, optimizer, args.epochs, train_loader, args.cuda)
+                model, epoch_losses_ipw = lstm.lstm_fit(model, optimizer, args.epochs, trainCV_loader, args.cuda)
 
-                loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data_lstm(model, train_loader, cuda=args.cuda)
-                loss_test, T_test, PS_logits_test, Y_test, X_test = transfer_data_lstm(model, test_loader, cuda=args.cuda)
+                loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data_lstm(model, trainCV_loader,
+                                                                                            cuda=args.cuda)
+                loss_val, T_val, PS_logits_val, Y_val, X_val = transfer_data_lstm(model, valCV_loader,
+                                                                                  cuda=args.cuda)
+
+
                 # (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
                 result_train = _evaluation_helper(X_train, T_train, PS_logits_train, loss_train)
-                result_test = _evaluation_helper(X_test, T_test, PS_logits_test, loss_test)
+                result_val = _evaluation_helper(X_val, T_val, PS_logits_val, loss_val)
 
                 n_train = len(X_train)
-                n_test = len(X_test)
-                result_all = _evaluation_helper(
-                    np.concatenate((X_train, X_test)),
-                    np.concatenate((T_train, T_test)),
-                    np.concatenate((PS_logits_train, PS_logits_test)),
-                    _loss_helper([loss_train, loss_test], [n_train, n_test])
+                n_val = len(X_val)
+                # n_test = len(X_test)
+
+                result_trainval = _evaluation_helper(
+                    np.concatenate((X_train, X_val)),
+                    np.concatenate((T_train, T_val)),
+                    np.concatenate((PS_logits_train, PS_logits_val)),
+                    _loss_helper([loss_train, loss_val], [n_train, n_val])
                 )
 
-                i_model_balance_over_kfold.append(result_all[5])
-                i_model_fit_over_kfold.append(result_test[1])
+                # result_all = _evaluation_helper(
+                #     np.concatenate((X_train, X_test)),
+                #     np.concatenate((T_train, T_test)),
+                #     np.concatenate((PS_logits_train, PS_logits_test)),
+                #     _loss_helper([loss_train, loss_test], [n_train, n_test])
+                # )
 
-                results.append((i, k, hyper_paras, model_params) + result_train + result_test + result_all)
+                i_model_balance_over_kfold.append(result_trainval[5])
+                i_model_fit_over_kfold.append(result_val[1])
+
+                results.append((i, k, hyper_paras, model_params) + result_train + result_val + result_trainval)
 
             i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
             i_model_fit = [np.mean(i_model_fit_over_kfold), np.std(i_model_fit_over_kfold)]
@@ -516,7 +542,7 @@ if __name__ == "__main__":
             if (i_model_balance[0] < best_balance) or \
                     ((i_model_balance[0] == best_balance) and (i_model_fit[0] > best_auc)):
                 # model with current best configuration re-trained on the whole dataset.
-                best_model = model
+                # best_model = model
                 best_hyper_paras = hyper_paras
                 best_model_params = model_params
 
@@ -526,7 +552,7 @@ if __name__ == "__main__":
                 print('Save Best PSModel at Hyper-iter[{}/{}]'.format(i, len(hyper_paras_list)),
                       'best hyper:', best_hyper_paras,
                       'best model paras:', best_model_params,
-                      "all-balance", best_balance, 'test-auc:', best_auc,)
+                      "all-balance", best_balance, 'test-auc:', best_auc, )
 
             if i_model_fit[0] > global_best_auc:
                 global_best_auc = i_model_fit[0]
@@ -534,40 +560,66 @@ if __name__ == "__main__":
             if i_model_balance[0] < global_best_balance:
                 global_best_balance = i_model_balance[0]
 
-            # save re-trained results on the whole data, for model selection exp only. Not necessary for later use
+            # save re-trained results on the training data, for model selection exp only. Not necessary for later use
             model_retrain = lstm.LSTMModel(**model_params)
             if args.cuda:
                 model_retrain = model_retrain.to('cuda')
             optimizer_retrain = torch.optim.Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
-            all_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
-                                                          sampler=SubsetRandomSampler(indices))
-            model_retrain, epoch_losses_ipw = lstm.lstm_fit(model_retrain, optimizer_retrain, args.epochs, all_data_loader, args.cuda)
+            # used batch_size train loader for training
+            train_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+                                                            sampler=SubsetRandomSampler(train_indices))
+            model_retrain, epoch_losses_ipw = lstm.lstm_fit(model_retrain, optimizer_retrain, args.epochs,
+                                                            train_data_loader, args.cuda)
+            if best_hyper_paras == hyper_paras:
+                #save best model, retrained on the train + val data
+                best_model = model_retrain
+                save_model(model_retrain, args.save_model_filename, model_params=best_model_params)
+
+            # use original train loader for evaluation
             loss_retrain, T_retrain, PS_logits_retrain, Y_retrain, X_retrain = transfer_data_lstm(
-                model_retrain, all_data_loader, cuda=args.cuda)
+                model_retrain, train_loader, cuda=args.cuda)
             # (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
             result_retrain = _evaluation_helper(X_retrain, T_retrain, PS_logits_retrain, loss_retrain)
-            results_retrain.append((i, 'retrain', hyper_paras, model_params) + result_retrain)
+
+            # test
+            loss_test, T_test, PS_logits_test, Y_test, X_test = transfer_data_lstm(model, test_loader,
+                                                                                   cuda=args.cuda)
+            result_test = _evaluation_helper(X_test, T_test, PS_logits_test, loss_test)
+
+            # all
+            n_retrain = len(X_retrain)
+            n_test = len(X_test)
+            result_all = _evaluation_helper(
+                np.concatenate((X_retrain, X_test)),
+                np.concatenate((T_retrain, T_test)),
+                np.concatenate((PS_logits_retrain, PS_logits_test)),
+                _loss_helper([loss_retrain, loss_test], [n_retrain, n_test])
+            )
+
+            results_retrain.append((i, 'retrain', hyper_paras, model_params) + result_retrain + result_test + result_all)
             #
 
-        print('re-training best model on all the data using best model parameter...')
-        print('best model parameter:', best_model_params)
-        best_model = lstm.LSTMModel(**best_model_params)
-        if args.cuda:
-            best_model = best_model.to('cuda')
-        print(best_model)
-        hidden_size, lr, weight_decay, batch_size = best_hyper_paras
-        optimizer = torch.optim.Adam(best_model.parameters(), lr=lr, weight_decay=weight_decay)
-        all_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
-                                                      sampler=SubsetRandomSampler(indices))
-        best_model, epoch_losses_ipw = lstm.lstm_fit(best_model, optimizer, args.epochs, all_data_loader, args.cuda)
-        save_model(best_model, args.save_model_filename, model_params=best_model_params)
+        ## because I saved best model above, thus ignore below for speed. If not saved above, should add following codes
+        # print('re-training best model on all the data using best model parameter...')
+        # print('best model parameter:', best_model_params)
+        # best_model = lstm.LSTMModel(**best_model_params)
+        # if args.cuda:
+        #     best_model = best_model.to('cuda')
+        # print(best_model)
+        # hidden_size, lr, weight_decay, batch_size = best_hyper_paras
+        # optimizer = torch.optim.Adam(best_model.parameters(), lr=lr, weight_decay=weight_decay)
+        # all_data_loader = torch.utils.data.DataLoader(my_dataset, batch_size=batch_size,
+        #                                               sampler=SubsetRandomSampler(indices))
+        # best_model, epoch_losses_ipw = lstm.lstm_fit(best_model, optimizer, args.epochs, all_data_loader, args.cuda)
+        # save_model(best_model, args.save_model_filename, model_params=best_model_params)
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain all_'] for x in name]
+        col_name = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain trainval_']
+                                                              for x in name]
         results = pd.DataFrame(results, columns=col_name)
         results['paras_str'] = results['paras'].apply(lambda x: str(x))
 
-        col_name_retrain = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['all_'] for x in name]
+        col_name_retrain = ['i', 'fold-k', 'paras', 'model paras'] + [pre + x for pre in ['trainval_', 'test_', 'all_'] for x in name]
         results_retrain = pd.DataFrame(results_retrain, columns=col_name_retrain)
         results_retrain['paras_str'] = results_retrain['paras'].apply(lambda x: str(x))
 
@@ -577,11 +629,13 @@ if __name__ == "__main__":
         results_agg.columns = results_agg.columns.map('-'.join)
         results_agg = pd.merge(results_agg, results_retrain, left_on='paras_str-', right_on='paras_str', how='left')
 
-
         results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
-        results_all_list, results_all_df = final_eval_deep_cv_revise(
-            lstm.LSTMModel, args, train_loader, val_loader, test_loader,
+
+        results_all_list, results_all_df = final_eval_deep_cv_revise_traintest(
+            lstm.LSTMModel, args,
+            train_loader,
+            test_loader,
             data_loader, drug_name, feature_name, n_feature, dump_ori=False, lstm=True)
 
     # %% Logistic regression PS PSModels
@@ -602,7 +656,8 @@ if __name__ == "__main__":
         if args.run_model == 'LR':
             paras_grid = {
                 'penalty': ['l1', 'l2'],
-                'C': 10 ** np.arange(-3, 3, 0.5), #0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+                'C': 10 ** np.arange(-3, 3, 0.5),
+                # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
                 'max_iter': [200],  # [100, 200, 500],
                 'random_state': [args.random_seed],
             }
@@ -644,7 +699,7 @@ if __name__ == "__main__":
         #                                                  test_x, test_t, test_y, x, t, y,
         #                                                  drug_name, feature_name, n_feature, dump_ori=False)
         results_all_list, results_all_df = final_eval_ml_CV_revise_traintest(
-            model, args,  train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
+            model, args, train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
             drug_name, feature_name, n_feature, dump_ori=False)
 
     # %%  MLP PS Models
@@ -735,7 +790,8 @@ if __name__ == "__main__":
                 # scheduler.step()
                 epoch_losses_ipw = np.mean(epoch_losses_ipw)
 
-                loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data(model, train_loader, cuda=args.cuda)
+                loss_train, T_train, PS_logits_train, Y_train, X_train = transfer_data(model, train_loader,
+                                                                                       cuda=args.cuda)
                 loss_val, T_val, PS_logits_val, Y_val, X_val = transfer_data(model, val_loader, cuda=args.cuda)
                 loss_test, T_test, PS_logits_test, Y_test, X_test = transfer_data(model, test_loader, cuda=args.cuda)
 
@@ -762,7 +818,8 @@ if __name__ == "__main__":
                 )
 
                 results.append(
-                    (i_iter, i, epoch, hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
+                    (i_iter, i, epoch,
+                     hyper_paras) + result_train + result_val + result_test + result_trainval + result_all)
 
                 print('HP-i:{}, epoch:{}, loss:{}\n'
                       'trainval-balance:{}, all-balance:{}, val-auc:{}, test-auc:{}'.format(
@@ -790,7 +847,7 @@ if __name__ == "__main__":
                     global_best_balance = result_trainval[5]
 
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
-        col_name = ['i', 'ipara', 'epoch','paras'] + \
+        col_name = ['i', 'ipara', 'epoch', 'paras'] + \
                    [pre + x for pre in ['train_', 'val_', 'test_', 'trainval_', 'all_'] for x in name]
         results = pd.DataFrame(results, columns=col_name)
 
@@ -808,7 +865,6 @@ if __name__ == "__main__":
                                                            drug_name, feature_name, n_feature, dump_ori=False)
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
-
 
 # if __name__ == "__main__":
 #     start_time = time.time()

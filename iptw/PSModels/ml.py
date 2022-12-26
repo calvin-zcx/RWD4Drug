@@ -355,15 +355,15 @@ class PropensityEstimator:
                 # evaluating goodness-of-balance and goodness-of-fit
                 result_train = self._evaluation_helper(X_train, T_train, T_train_pre)
                 result_val = self._evaluation_helper(X_val, T_val, T_val_pre)
-                result_all = self._evaluation_helper(
+                result_trainval = self._evaluation_helper(
                     np.concatenate((X_train, X_val)),
                     np.concatenate((T_train, T_val)),
                     np.concatenate((T_train_pre, T_val_pre))
                 )# (loss, auc, max_smd, n_unbalanced_feature, max_smd_weighted, n_unbalanced_feature_weighted)
-                i_model_balance_over_kfold.append(result_all[5])
+                i_model_balance_over_kfold.append(result_trainval[5])
                 i_model_fit_over_kfold.append(result_val[1])
 
-                self.results.append((i, k, para_d) + result_train + result_val + result_all)
+                self.results.append((i, k, para_d) + result_train + result_val + result_trainval)
                 # end of one fold
 
             i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
@@ -409,6 +409,8 @@ class PropensityEstimator:
         # end of training
         print('best model parameter:', self.best_hyper_paras)
         print('re-training best model on all the data using best model parameter...')
+        # best model is used in predicting ps
+        # retrained here
         self.best_model = self._model_estimation(self.best_hyper_paras, X, T)
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
         col_name = ['i', 'fold-k', 'paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain trainval_'] for x in name]
