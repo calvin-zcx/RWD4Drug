@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import zipfile
 
 import torch
@@ -186,7 +187,7 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
 
 def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('revise_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    fo = open('revise_testset_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
 
     # load others:
@@ -200,7 +201,7 @@ def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min
     print('len(added_drug): ', len(added_drug))
     print(added_drug)
 
-    fo.write('mkdir -p output/revise/{}/{}/log\n'.format(cohort_dir_name, model))
+    fo.write('mkdir -p output/revise_testset/{}/{}/log\n'.format(cohort_dir_name, model))
     n = 0
     for x in name_cnt:
         k, v = x
@@ -208,10 +209,10 @@ def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min
             drug = k.split('.')[0]
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, niter):
-                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/revise/{}/{}/ --random_seed {} " \
+                    cmd = "python main_revise_testset.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/revise_testset/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/revise/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                          "2>&1 | tee output/revise_testset/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
                         ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
@@ -346,7 +347,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -362,117 +363,162 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                 except:
                     print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
 
-                # 1. selected by validation AUC
-                dftmp = df.sort_values(by=['val_auc', 'i'], ascending=[False, True])
-                val_auc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-                val_auc_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_auc_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')] #'test_auc'# change due to our cv setting
+                selection_configs = [
+                    ('val_auc', 'i', False, True), ('val_loss', 'i', True, True),
+                    ('val_max_smd_iptw', 'i', True, True), ('val_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('train_auc', 'i', False, True), ('train_loss', 'i', True, True),
+                    ('train_max_smd_iptw', 'i', True, True), ('train_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('trainval_auc', 'i', False, True), ('trainval_loss', 'i', True, True),
+                    ('trainval_max_smd_iptw', 'i', True, True), ('trainval_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('trainval_n_unbalanced_feat_iptw', 'val_auc', True, False), ('trainval_n_unbalanced_feat_iptw', 'val_loss', True, True)
+                ]
+                selection_results = []
+                selection_results_colname = []
+                for col1, col2, order1, order2 in selection_configs:
+                    # print('col1, col2, ascending order1, order2:', col1, col2, order1, order2)
+                    dftmp = df.sort_values(by=[col1, col2], ascending=[order1, order2])
+                    sr = []
+                    sr_colname = []
+                    for c in [col1, col2,
+                              'test_loss', 'test_auc', 'test_max_smd', 'test_max_smd_iptw', 'test_n_unbalanced_feat', 'test_n_unbalanced_feat_iptw',
+                              'all_loss', 'all_auc', 'all_max_smd', 'all_max_smd_iptw', 'all_n_unbalanced_feat', 'all_n_unbalanced_feat_iptw',
+                              'all_reduction_n_unbalance', 'all_reduction_n_unbalance_percent',
+                              'test_reduction_n_unbalance_percent']:
+                        # print(c)
+                        if c == 'all_reduction_n_unbalance':
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] -
+                                      dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')])
+                        elif c == 'test_reduction_n_unbalance':
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] -
+                                      dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')])
+                        elif c == 'all_reduction_n_unbalance_percent':
+                            delta = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] - \
+                                    dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                            denom = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')]
+                            per = delta/denom if denom!=0 else 0
+                            sr.append(per)
+                        elif c == 'test_reduction_n_unbalance_percent':
+                            delta = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] - \
+                                    dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')]
+                            denom = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')]
+                            per = delta / denom if denom != 0 else 0
+                            sr.append(per)
+                        else:
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc(c)])
+                        if (c in [col1, col2]) and (c != 'i'):
+                            sr_colname.append(c)
+                        else:
+                            sr_colname.append('{}-{}-{}'.format(col1, col2, c))
+                    selection_results.extend(sr)
+                    selection_results_colname.extend(sr_colname)
 
-                # 2. selected by val_max_smd_iptw
-                dftmp = df.sort_values(by=['val_max_smd_iptw', 'i'], ascending=[True, True])
-                val_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_max_smd_iptw')]
-                val_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')] # 'test_auc'
+                results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type] + selection_results)
 
-                # 3. selected by val_n_unbalanced_feat_iptw
-                dftmp = df.sort_values(by=['val_n_unbalanced_feat_iptw', 'i'], ascending=[True, False])  # [True, True]
-                val_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_n_unbalanced_feat_iptw')]
-                val_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-
-                # new 4. selected by val_loss
-                dftmp = df.sort_values(by=['val_loss', 'i'], ascending=[True, False])  # [True, True]
-                val_loss = dftmp.iloc[0, dftmp.columns.get_loc('val_loss')]
-                val_loss_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                val_loss_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-
-
-                # 4. selected by train_max_smd_iptw
-                dftmp = df.sort_values(by=['train_max_smd_iptw', 'i'], ascending=[True, True])
-                train_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_max_smd_iptw')]
-                train_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                train_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-
-                # 5. selected by train_n_unbalanced_feat_iptw
-                dftmp = df.sort_values(by=['train_n_unbalanced_feat_iptw', 'i'],
-                                       ascending=[True, False])  # [True, True]
-                train_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
-                train_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                train_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-
+                # # 1. selected by validation AUC
+                # dftmp = df.sort_values(by=['val_auc', 'i'], ascending=[False, True])
+                # val_auc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # val_auc_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_auc_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 2. selected by val_max_smd_iptw
+                # dftmp = df.sort_values(by=['val_max_smd_iptw', 'i'], ascending=[True, True])
+                # val_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_max_smd_iptw')]
+                # val_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 3. selected by val_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['val_n_unbalanced_feat_iptw', 'i'], ascending=[True, False])  # [True, True]
+                # val_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_n_unbalanced_feat_iptw')]
+                # val_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 4. selected by train_max_smd_iptw
+                # dftmp = df.sort_values(by=['train_max_smd_iptw', 'i'], ascending=[True, True])
+                # train_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_max_smd_iptw')]
+                # train_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # train_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 5. selected by train_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['train_n_unbalanced_feat_iptw', 'i'],
+                #                        ascending=[True, False])  # [True, True]
+                # train_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
+                # train_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # train_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
                 # # 6. selected by trainval_max_smd_iptw
                 # dftmp = df.sort_values(by=['trainval_max_smd_iptw', 'i'], ascending=[True, True])
                 # trainval_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_max_smd_iptw')]
                 # trainval_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                # trainval_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # trainval_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
                 #
                 # # 7. selected by trainval_n_unbalanced_feat_iptw
                 # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'i'],
                 #                        ascending=[True, False])  # [True, True]
                 # trainval_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
                 # trainval_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                # trainval_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-
-                # 8. FINAL: selected by trainval_n_unbalanced_feat_iptw + val AUC
+                # trainval_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 8. FINAL: selected by trainval_n_unbalanced_feat_iptw + val AUC
                 # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
-                dftmp = df.sort_values(by=['beforRetrain all_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
-                trainval_final_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('beforRetrain all_n_unbalanced_feat_iptw')]
-                trainval_final_valauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
-                trainval_final_finalnsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                trainval_final_testnauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # trainval_final_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
+                # trainval_final_valauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # trainval_final_finalnsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_final_testnauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type,
+                #                 val_auc, val_auc_nsmd, val_auc_testauc,
+                #                 val_maxsmd, val_maxsmd_nsmd, val_maxsmd_testauc,
+                #                 val_nsmd, val_nsmd_nsmd, val_nsmd_testauc,
+                #                 train_maxsmd, train_maxsmd_nsmd, train_maxsmd_testauc,
+                #                 train_nsmd, train_nsmd_nsmd, train_nsmd_testauc,
+                #                 trainval_maxsmd, trainval_maxsmd_nsmd, trainval_maxsmd_testauc,
+                #                 trainval_nsmd, trainval_nsmd_nsmd, trainval_nsmd_testauc,
+                #                 trainval_final_nsmd, trainval_final_valauc, trainval_final_finalnsmd,
+                #                 trainval_final_testnauc,
+                #                 ])
 
-                results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type,
-                                val_auc, val_auc_nsmd, val_auc_testauc,
-                                val_maxsmd, val_maxsmd_nsmd, val_maxsmd_testauc,
-                                val_nsmd, val_nsmd_nsmd, val_nsmd_testauc,
-                                train_maxsmd, train_maxsmd_nsmd, train_maxsmd_testauc,
-                                train_nsmd, train_nsmd_nsmd, train_nsmd_testauc,
-                                trainval_maxsmd, trainval_maxsmd_nsmd, trainval_maxsmd_testauc,
-                                trainval_nsmd, trainval_nsmd_nsmd, trainval_nsmd_testauc,
-                                trainval_final_nsmd, trainval_final_valauc, trainval_final_finalnsmd,
-                                trainval_final_testnauc,
-                                ])
-
-        rdf = pd.DataFrame(results, columns=['fname', 'ctrl_type',
-                                             "val_auc", "val_auc_nsmd", "val_auc_testauc",
-                                             "val_maxsmd", "val_maxsmd_nsmd", "val_maxsmd_testauc",
-                                             "val_nsmd", "val_nsmd_nsmd", "val_nsmd_testauc",
-                                             "train_maxsmd", "train_maxsmd_nsmd", "train_maxsmd_testauc",
-                                             "train_nsmd", "train_nsmd_nsmd", "train_nsmd_testauc",
-                                             "trainval_maxsmd", "trainval_maxsmd_nsmd", "trainval_maxsmd_testauc",
-                                             "trainval_nsmd", "trainval_nsmd_nsmd", "trainval_nsmd_testauc",
-                                             "trainval_final_nsmd", "trainval_final_valauc", "trainval_final_finalnsmd",
-                                             "trainval_final_testnauc",
-                                             ])
-
+        rdf = pd.DataFrame(results, columns=['fname', 'ctrl_type'] + selection_results_colname)
         rdf.to_csv(dirname + 'results/' + drug + '_model_selection.csv')
+
+        pre_col = []
+        for col1, col2, order1, order2 in selection_configs:
+            pre_col.append('{}-{}-'.format(col1, col2))
 
         for t in ['random', 'atc', 'all']:
             # fig = plt.figure(figsize=(20, 15))
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 18))
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 18))
             if t != 'all':
                 idx = rdf['ctrl_type'] == t
             else:
                 idx = rdf['ctrl_type'].notna()
-            boxplot = rdf[idx].boxplot(column=["val_auc_nsmd", "val_maxsmd_nsmd", "val_nsmd_nsmd", "train_maxsmd_nsmd",
-                                               "train_nsmd_nsmd", "trainval_maxsmd_nsmd", "trainval_nsmd_nsmd",
-                                               "trainval_final_finalnsmd"], rot=25, fontsize=15, ax=ax1)
+            boxplot = rdf[idx].boxplot(column=[x+'all_n_unbalanced_feat_iptw' for x in pre_col], fontsize=15, ax=ax1, showmeans=True) #  rot=25,
             ax1.axhline(y=5, color='r', linestyle='-')
             boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug), '0-19', t, model), fontsize=25)
             # plt.xlabel("Model selection methods", fontsize=15)
             ax1.set_ylabel("#unbalanced_feat_iptw of boostrap experiments", fontsize=20)
+            print(ax1.get_xticklabels())
+            ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, horizontalalignment='right')
             # fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}-allnsmd.png'.format(t))
             # plt.show()
 
             # fig = plt.figure(figsize=(20, 15))
-            boxplot = rdf[idx].boxplot(column=["val_auc_testauc", "val_maxsmd_testauc", "val_nsmd_testauc",
-                                               "train_maxsmd_testauc", "train_nsmd_testauc", "trainval_maxsmd_testauc",
-                                               "trainval_nsmd_testauc", 'trainval_final_testnauc'], rot=25, fontsize=15,
-                                       ax=ax2)
+            boxplot = rdf[idx].boxplot(column=[x+'test_auc' for x in pre_col], fontsize=15, ax=ax2, showmeans=True)
             # plt.axhline(y=0.5, color='r', linestyle='-')
             # boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug), '0-19', t, model), fontsize=25)
             ax2.set_xlabel("Model selection methods", fontsize=20)
             ax2.set_ylabel("test_auc of boostrap experiments", fontsize=20)
+            ax2.set_xticklabels(ax2.get_xticklabels(), rotation=45, horizontalalignment='right')
+
+            boxplot = rdf[idx].boxplot(column=[x + 'all_reduction_n_unbalance_percent' for x in pre_col], fontsize=15, ax=ax3, showmeans=True)
+            ax3.set_xlabel("Model selection methods", fontsize=20)
+            ax3.set_ylabel("all_reduction_n_unbalance", fontsize=20)
+            ax3.set_xticklabels(ax3.get_xticklabels(), rotation=45, horizontalalignment='right')
+
+            boxplot = rdf[idx].boxplot(column=[x + 'test_reduction_n_unbalance_percent' for x in pre_col], fontsize=15, ax=ax4, showmeans=True)
+            ax4.set_xlabel("Model selection methods", fontsize=20)
+            ax4.set_ylabel("test_reduction_n_unbalance", fontsize=20)
+            ax4.set_xticklabels(ax4.get_xticklabels(), rotation=45, horizontalalignment='right')
+
             plt.tight_layout()
             fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}.png'.format(t))
             plt.clf()
@@ -483,7 +529,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -2064,19 +2110,22 @@ if __name__ == '__main__':
     # split_shell_file("revise_testset_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
 
     #
-    # df_drug = pd.read_excel(
-    #     r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
-    #     'all', dtype={'drug':str})
-    # drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
-    #
+    df_drug = pd.read_excel(
+        r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
+        'all', dtype={'drug':str})
+    drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
+
     # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False)
     # split_shell_file("revise_shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
-
+    shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
+    split_shell_file("revise_testset_shell_LIGHTGBM_save_cohort_all_loose.sh", divide=3, skip_first=1)
     # return 1
+    sys.exit(0)
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
     results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    sys.exit(0)
     results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
