@@ -595,16 +595,18 @@ def results_ATE_for_ml(cohort_dir_name, model, niter=50):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
                     df = pd.read_csv(fname + '_results.csv')
+                    r = df.loc[3, :]
+                    for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original",
+                              "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW"]:
+                        r.loc[c] = stringlist_2_list(r.loc[c])[-1]
+                    r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
+                                  index=['fname', 'ctrl_type']).append(r)
+                    results.append(r)
+
                 except:
                     print('No file exisits: ', fname + '_results.csv')
 
-                r = df.loc[3, :]
-                for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original",
-                          "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW"]:
-                    r.loc[c] = stringlist_2_list(r.loc[c])[-1]
-                r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                              index=['fname', 'ctrl_type']).append(r)
-                results.append(r)
+
         rdf = pd.DataFrame(results)
         rdf.to_excel(dirname + 'results/' + drug + '_results.xlsx')
     print('Done')

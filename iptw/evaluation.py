@@ -767,6 +767,7 @@ def cal_weights(golds_treatment, logits_treatment, normalized, stabilized=True, 
     ones_idx, zeros_idx = np.where(golds_treatment == 1), np.where(golds_treatment == 0)
     logits_treatment = logits_to_probability(logits_treatment, normalized)
     p_T = len(ones_idx[0]) / (len(ones_idx[0]) + len(zeros_idx[0]))
+
     # comment out p_T scaled IPTW
     if stabilized:
         # stabilized weights:   treated_w.sum() + controlled_w.sum() ~ N
@@ -782,6 +783,13 @@ def cal_weights(golds_treatment, logits_treatment, normalized, stabilized=True, 
         # controlled_w = np.clip(controlled_w, a_min=1e-06, a_max=50)
         amin = np.quantile(np.concatenate((treated_w, controlled_w)), 0.01)
         amax = np.quantile(np.concatenate((treated_w, controlled_w)), 0.99)
+
+        if pd.isna(amax):
+            # if there are inf involved in qunatile, returen nan
+            amax = np.quantile(np.concatenate((treated_w, controlled_w)), 0.8)
+        if pd.isna(amin):
+            amin = np.quantile(np.concatenate((treated_w, controlled_w)), 0.2)
+
         # print('Using IPTW trim [{}, {}]'.format(amin, amax))
         treated_w = np.clip(treated_w, a_min=amin, a_max=amax)
         controlled_w = np.clip(controlled_w, a_min=amin, a_max=amax)

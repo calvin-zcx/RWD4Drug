@@ -40,7 +40,7 @@ class PropensityEstimator:
             self.paras_list = [{self.paras_names[i]: para[i] for i in range(len(para))} for para in paras_list]
             if self.learner == 'LR':
                 no_penalty_case = {'penalty': 'none', 'max_iter': 200, 'random_state': random_seed}
-                if (no_penalty_case not in self.paras_list) and (len(self.paras_list) > 1):
+                if (no_penalty_case not in self.paras_list) and (len(self.paras_list) >= 1):
                     self.paras_list.append(no_penalty_case)
                     print('Add no penalty case to logistic regression model:', no_penalty_case)
         else:
@@ -86,8 +86,8 @@ class PropensityEstimator:
                 else:
                     para_d['solver'] = 'lbfgs'
                 model = LogisticRegression(**para_d).fit(X_train, T_train)
-            elif self.learner == 'XGBOOST':
-                model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
+            # elif self.learner == 'XGBOOST':
+            #     model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
             elif self.learner == 'LIGHTGBM':
                 model = lgb.LGBMClassifier(**para_d).fit(X_train, T_train)
             else:
@@ -142,8 +142,8 @@ class PropensityEstimator:
                 else:
                     para_d['solver'] = 'lbfgs'
                 model = LogisticRegression(**para_d).fit(X_train, T_train)
-            elif self.learner == 'XGBOOST':
-                model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
+            # elif self.learner == 'XGBOOST':
+            #     model = xgb.XGBClassifier(**para_d).fit(X_train, T_train)
             elif self.learner == 'LIGHTGBM':
                 model = lgb.LGBMClassifier(**para_d).fit(X_train, T_train)
             else:

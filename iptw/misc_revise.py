@@ -27,7 +27,7 @@ import multipy.fdr as fdr
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 10 #5
+MAX_NO_UNBALANCED_FEATURE = 5 #0 # 10 #5
 # 5
 print('Global MAX_NO_UNBALANCED_FEATURE: ', MAX_NO_UNBALANCED_FEATURE)
 
@@ -364,6 +364,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                     df.rename(columns=_simplify_col_, inplace=True)
                 except:
                     print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
+                    continue
 
                 selection_configs = [
                     ('val_auc', 'i', False, True), ('val_loss', 'i', True, True),
@@ -537,7 +538,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     check_and_mkdir(dirname + 'results/')
 
     writer = pd.ExcelWriter(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), engine='xlsxwriter')
-    for t in ['random', 'atc', 'all']:
+    for t in ['all', 'random', 'atc']:
         results = []
         for drug in drug_list:
             rdf = pd.read_csv(dirname + 'results/' + drug + '_model_selection.csv')
@@ -547,6 +548,10 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
             else:
                 idx = rdf['ctrl_type'].notna()
 
+            if idx.sum() == 0:
+                print('empty trials in:', drug, t)
+                continue
+
             r = [drug, drug_name.get(drug, '')]
             col_name = ['drug', 'drug_name']
             # zip(["val_auc_nsmd", "val_maxsmd_nsmd", "val_nsmd_nsmd", "train_maxsmd_nsmd",
@@ -555,8 +560,12 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
             #     ["val_auc_testauc", "val_maxsmd_testauc", "val_nsmd_testauc",
             #      "train_maxsmd_testauc", "train_nsmd_testauc", "trainval_maxsmd_testauc",
             #      "trainval_nsmd_testauc", 'trainval_final_testnauc'])
-            for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "trainval_final_finalnsmd"],
-                              ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
+            # for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "trainval_final_finalnsmd"],
+            #                   ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
+            for c1, c2 in zip(["val_auc-i-all_n_unbalanced_feat_iptw", "train_loss-i-all_n_unbalanced_feat_iptw",
+                               "trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw"],
+                              ["val_auc-i-test_auc", "train_loss-i-test_auc",
+                               "trainval_n_unbalanced_feat_iptw-val_auc-test_auc"]):
                 nsmd = rdf.loc[idx, c1]
                 auc = rdf.loc[idx, c2]
 
@@ -584,17 +593,17 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
                      "success_rate-" + c1, "success_rate_ci-" + c1, "success_rate_std-" + c1,
                      "auc_med-" + c2, "auc_iqr-" + c2, "auc_mean-" + c2, "auc_mean_ci-" + c2, "auc_mean_std-" + c2])
 
-            x = np.array(rdf.loc[idx, "trainval_final_finalnsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
-            y1 = np.array(rdf.loc[idx, "val_auc_nsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
-            y2 = np.array(rdf.loc[idx, "val_maxsmd_nsmd"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float)
+            x = np.array(rdf.loc[idx, "trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float64)
+            y1 = np.array(rdf.loc[idx, "val_auc-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float64)
+            y2 = np.array(rdf.loc[idx, "train_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE, dtype=np.float64)
             p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
             p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
             p3, test_orig3 = bootstrap_mean_pvalue_2samples(y1, y2)
             r.extend([p1, test_orig1[1], p2, test_orig2[1], p3, test_orig3[1]])
             col_name.extend(
                 ['pboot-succes-final-vs-auc', 'p-succes-final-vs-auc',
-                 'pboot-succes-final-vs-maxsmd', 'p-succes-final-vs-maxsmd',
-                 'pboot-succes-auc-vs-maxsmd', 'p-succes-auc-vs-maxsmd'])
+                 'pboot-succes-final-vs-loss', 'p-succes-final-vs-loss',
+                 'pboot-succes-auc-vs-loss', 'p-succes-auc-vs-loss'])
 
             results.append(r)
         df = pd.DataFrame(results, columns=col_name)
@@ -704,16 +713,19 @@ def results_ATE_for_ml(cohort_dir_name, model, niter=50):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
                     df = pd.read_csv(fname + '_results.csv')
+                    r = df.loc[df.index[df['Unnamed: 0'] == 'all'].tolist()[0], :]
+                    for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original", "KM1-0_original_p",
+                              "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW", "KM1-0_IPTW_p"]:
+                        r.loc[c] = stringlist_2_list(r.loc[c])[-1]
+                    r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
+                                  index=['fname', 'ctrl_type']).append(r)
+                    results.append(r)
+
                 except:
                     print('No file exisits: ', fname + '_results.csv')
+                    continue
 
-                r = df.loc[df.index[df['Unnamed: 0']=='all'].tolist()[0], :]
-                for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original", "KM1-0_original_p",
-                          "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW", "KM1-0_IPTW_p"]:
-                    r.loc[c] = stringlist_2_list(r.loc[c])[-1]
-                r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                              index=['fname', 'ctrl_type']).append(r)
-                results.append(r)
+
         rdf = pd.DataFrame(results)
         rdf.to_excel(dirname + 'results/' + drug + '_results.xlsx')
     print('Done')
@@ -811,6 +823,37 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
                 # col_name.extend(["med-" + c, "iqr-" + c, "mean-" + c, "mean_ci-" + c, 'pvalue-' + c])
                 col_name.extend(["med-" + c, "iqr-" + c, "mean-" + c, "mean_ci-" + c, ])
 
+            if len(nv) > 0:
+                nv1 = rdf.loc[idx, 'HR_ori']
+                p1, _ = bootstrap_mean_pvalue(nv1, expected_mean=1)
+
+                nv2 = rdf.loc[idx, 'HR_IPTW']
+                p2, _ = bootstrap_mean_pvalue(nv2, expected_mean=1)
+
+                nv3 = rdf.loc[idx, 'KM1-0_original']
+                p3, _ = bootstrap_mean_pvalue(nv3, expected_mean=0)
+
+                nv4 = rdf.loc[idx, 'KM1-0_IPTW']
+                p4, _ = bootstrap_mean_pvalue(nv4, expected_mean=0)
+
+                r.extend([p1, p2, p3, p4])
+
+            else:
+                r.extend([np.nan, np.nan, np.nan, np.nan])
+            col_name.extend(['pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap',
+                             'pvalue-KM1-0_original-boostrap', 'pvalue-KM1-0_IPTW-boostrap'])
+
+            if len(nv) > 0:
+                nv = rdf.loc[idx, 'HR_IPTW_p']
+                _rid = nv[nv == nv.quantile(interpolation='nearest')].index[0]
+                HR_ori_CI = rdf.loc[_rid, 'HR_ori_CI']
+                HR_IPTW_CI = rdf.loc[_rid, 'HR_IPTW_CI']
+                r.extend([HR_ori_CI, HR_IPTW_CI])
+            else:
+                r.extend([np.nan, np.nan])
+
+            col_name.extend(["med-HR_ori_CI", "med-HR_IPTW_CI"])
+
             if 'HR_ori_CI' in rdf.columns:
                 r.append(';'.join(rdf.loc[idx, 'HR_ori_CI']))
                 col_name.append('HR_ori_CI')
@@ -835,7 +878,9 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
         # 1. minimum support set 10, may choose 20 later
         # 2. p value < 0.05
         # idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
-        idx = (df['support'] >= 10) & (df['med-HR_IPTW_p'] <= 0.05)
+        # idx = (df['support'] >= 10) & (df['med-HR_IPTW_p'] <= 0.05)
+        # idx = (df['support'] >= 10) & (df['pvalue-HR_IPTW-boostrap'] <= 0.05)
+        idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW-boostrap'] <= 0.05)
 
         # df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
         df_sort = df.loc[idx, :].sort_values(by=['mean-HR_IPTW'], ascending=[True])
@@ -848,7 +893,9 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
              # 'mean-ATE_IPTW', 'mean_ci-ATE_IPTW', 'pvalue-ATE_IPTW',
              # 'mean-KM1-0_original', 'mean_ci-KM1-0_original', 'pvalue-KM1-0_original',
              'mean-KM1-0_IPTW', 'mean_ci-KM1-0_IPTW', 'mean-KM1-0_IPTW_p', #'pvalue-KM1-0_IPTW',
-             'mean-HR_IPTW', 'mean_ci-HR_IPTW', 'mean-HR_IPTW_p' #'pvalue-HR_IPTW'
+             'mean-HR_IPTW', 'med-HR_IPTW',  'mean_ci-HR_IPTW', 'mean-HR_IPTW_p', 'med-HR_IPTW_p', #'pvalue-HR_IPTW'
+             "med-HR_ori_CI", "med-HR_IPTW_CI",
+             'pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap', 'pvalue-KM1-0_original-boostrap', 'pvalue-KM1-0_IPTW-boostrap'
              ]]
 
         df_final['n_ctrl'] = df_final['n_ctrl'].apply(
@@ -871,8 +918,14 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
 
         df_final['mean-HR_IPTW'] = df_final['mean-HR_IPTW'].apply(
             lambda x: '{:.2f}'.format(x))
+        df_final['med-HR_IPTW'] = df_final['med-HR_IPTW'].apply(
+            lambda x: '{:.2f}'.format(x))
+
         df_final['mean_ci-HR_IPTW'] = df_final['mean_ci-HR_IPTW'].apply(
             lambda x: stringlist_2_str(x, False, 2))
+
+        df_final['med-HR_ori_CI'] = df_final['med-HR_ori_CI'].apply( lambda x: stringlist_2_str(x, False, 2))
+        df_final['med-HR_IPTW_CI'] = df_final['med-HR_IPTW_CI'].apply( lambda x: stringlist_2_str(x, False, 2))
 
         df_final.to_excel(writer, sheet_name=sheet)
 
@@ -2137,13 +2190,14 @@ if __name__ == '__main__':
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
     # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+
+    sys.exit(0)
 
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
     # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
-    sys.exit(0)
+    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
 
     #
     # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
@@ -2152,6 +2206,9 @@ if __name__ == '__main__':
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+
+    sys.exit(0)
+
     #
     box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
