@@ -661,14 +661,14 @@ if __name__ == "__main__":
                 'max_iter': [200],  # [100, 200, 500],
                 'random_state': [args.random_seed],
             }
-
-            paras_grid = {
-                'penalty': ['l1',],
-                'C': [1,],
-                # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
-                'max_iter': [200],  # [100, 200, 500],
-                'random_state': [args.random_seed],
-            }
+            #
+            # paras_grid = {
+            #     'penalty': ['l1',],
+            #     'C': [1,],
+            #     # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+            #     'max_iter': [200],  # [100, 200, 500],
+            #     'random_state': [args.random_seed],
+            # }
         elif args.run_model == 'XGBOOST':
             paras_grid = {
                 'max_depth': [3, 4],
