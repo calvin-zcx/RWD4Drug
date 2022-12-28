@@ -778,16 +778,19 @@ def cal_weights(golds_treatment, logits_treatment, normalized, stabilized=True, 
         treated_w, controlled_w = 1. / logits_treatment[ones_idx], 1. / (
                 1. - logits_treatment[zeros_idx])  # why *p_T here? my added test
 
+    treated_w[np.isinf(treated_w)] = 0
+    controlled_w[np.isinf(controlled_w)] = 0
+
     if clip:
         # treated_w = np.clip(treated_w, a_min=1e-06, a_max=50)
         # controlled_w = np.clip(controlled_w, a_min=1e-06, a_max=50)
         amin = np.quantile(np.concatenate((treated_w, controlled_w)), 0.01)
         amax = np.quantile(np.concatenate((treated_w, controlled_w)), 0.99)
 
-        if pd.isna(amax):
+        if amax > 50:
             # if there are inf involved in qunatile, returen nan
             amax = np.quantile(np.concatenate((treated_w, controlled_w)), 0.8)
-        if pd.isna(amin):
+        if amin <= 1e-6:
             amin = np.quantile(np.concatenate((treated_w, controlled_w)), 0.2)
 
         # print('Using IPTW trim [{}, {}]'.format(amin, amax))

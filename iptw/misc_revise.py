@@ -386,7 +386,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                               'test_loss', 'test_auc', 'test_max_smd', 'test_max_smd_iptw', 'test_n_unbalanced_feat', 'test_n_unbalanced_feat_iptw',
                               'all_loss', 'all_auc', 'all_max_smd', 'all_max_smd_iptw', 'all_n_unbalanced_feat', 'all_n_unbalanced_feat_iptw',
                               'all_reduction_n_unbalance', 'all_reduction_n_unbalance_percent',
-                              'test_reduction_n_unbalance_percent']:
+                              'test_reduction_n_unbalance', 'test_reduction_n_unbalance_percent']:
                         # print(c)
                         if c == 'all_reduction_n_unbalance':
                             sr.append(dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] -
@@ -2189,7 +2189,7 @@ if __name__ == '__main__':
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
     results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
