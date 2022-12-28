@@ -45,6 +45,7 @@ def parse_args():
     parser.add_argument('--controlled_drug', choices=['atc', 'random'], default='random')
     parser.add_argument('--controlled_drug_ratio', type=int, default=3)  # 2 seems not good. keep unchanged
     parser.add_argument("--random_seed", type=int, default=0)
+    parser.add_argument('--train_ratio', type=float, default=0.8)  # )0001)
 
     parser.add_argument('--run_model', choices=['LSTM', 'LR', 'MLP', 'XGBOOST', 'LIGHTGBM'], default='LR')
     parser.add_argument('--med_code_topk', type=int, default=200)
@@ -379,7 +380,8 @@ if __name__ == "__main__":
     print('n_feature: ', n_feature, ':')
     # print(feature_name)
 
-    train_ratio = 0.8  # 0.5
+    # train_ratio = 0.8  # 0.5
+    train_ratio = args.train_ratio  # default 0.8
     print('train_ratio: ', train_ratio,
           'test_ratio: ', 1 - train_ratio)
 
