@@ -109,6 +109,68 @@ def transfer_data(model, dataloader, cuda=True):
         return loss_treatment, golds_treatment, logits_treatment, golds_outcome, original_val
 
 
+def cal_survival_HR_simple(golds_treatment, logits_treatment, golds_outcome, normalized):
+    ones_idx, zeros_idx = np.where(golds_treatment == 1), np.where(golds_treatment == 0)
+    treated_w, controlled_w = cal_weights(golds_treatment, logits_treatment, normalized)
+    if len(golds_outcome.shape) == 2:
+        treated_outcome, controlled_outcome = golds_outcome[ones_idx, 0], golds_outcome[zeros_idx, 0]
+        treated_outcome[treated_outcome == -1] = 0
+        controlled_outcome[controlled_outcome == -1] = 0
+    else:
+        raise ValueError
+
+    # kmf = KaplanMeierFitter()
+    T = golds_outcome[:, 1]
+    treated_t2e, controlled_t2e = T[ones_idx], T[zeros_idx]
+    # cox for hazard ratio
+    cph = CoxPHFitter()
+    event = golds_outcome[:, 0]
+    event[event == -1] = 0
+    weight = np.zeros(len(golds_treatment))
+    weight[ones_idx] = treated_w.squeeze()
+    weight[zeros_idx] = controlled_w.squeeze()
+    cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, 'weights': weight})
+    try:
+        cph.fit(cox_data, 'T', 'event', weights_col='weights', robust=True)
+        HR = cph.hazard_ratios_['treatment']
+        CI = np.exp(cph.confidence_intervals_.values.reshape(-1))
+
+        cph_ori = CoxPHFitter()
+        cox_data_ori = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment})
+        cph_ori.fit(cox_data_ori, 'T', 'event')
+        HR_ori = cph_ori.hazard_ratios_['treatment']
+        CI_ori = np.exp(cph_ori.confidence_intervals_.values.reshape(-1))
+    except:
+        cph = HR = CI = None
+        cph_ori = HR_ori = CI_ori = None
+
+    return (HR_ori, CI_ori, cph_ori), (HR, CI, cph)
+
+
+def model_eval_common_simple(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1, figsave='', report=5):
+    y_pred_prob = logits_to_probability(PS_logits, normalized)
+    # 1. IPTW sample weights
+    treated_w, controlled_w = cal_weights(T, PS_logits, normalized=normalized, stabilized=True)
+    treated_PS, control_PS = y_pred_prob[T == 1], y_pred_prob[T == 0]
+    n_treat, n_control = (T == 1).sum(), (T == 0).sum()
+
+    if verbose:
+        print('loss: {}'.format(loss))
+        print('treated_weights:',
+              pd.Series(treated_w.flatten()).describe().to_string().replace('\n', ';'))  # stats.describe(treated_w))
+        print('controlled_weights:', pd.Series(controlled_w.flatten()).describe().to_string().replace('\n',
+                                                                                                      ';'))  # stats.describe(controlled_w))
+        print('treated_PS:',
+              pd.Series(treated_PS.flatten()).describe().to_string().replace('\n', ';'))  # stats.describe(treated_PS))
+        print('controlled_PS:',
+              pd.Series(control_PS.flatten()).describe().to_string().replace('\n', ';'))  # stats.describe(control_PS))
+
+    cox_HR_ori, cox_HR = cal_survival_HR_simple(T, PS_logits, Y, normalized)
+    KM_ALL = (np.nan, np.nan, cox_HR_ori, cox_HR)
+
+    return KM_ALL
+
+
 def model_eval_common(X, T, Y, PS_logits, loss=None, normalized=False, verbose=1, figsave='', report=5):
     y_pred_prob = logits_to_probability(PS_logits, normalized)
     # 1. IPTW sample weights
@@ -809,7 +871,7 @@ def weighted_mean(x, w):
     # input: x: n * d, w: n * 1
     # output: d
     x_w = np.multiply(x, w)
-    n_w = w.sum()
+    n_w = np.sum(w)  # w.sum()
     m_w = np.sum(x_w, axis=0) / n_w
     return m_w
 
@@ -817,10 +879,23 @@ def weighted_mean(x, w):
 def weighted_var(x, w):
     # x: n * d, w: n * 1
     m_w = weighted_mean(x, w)  # d
-    nw, nsw = w.sum(), (w ** 2).sum()
+    # nw, nsw = w.sum(), (w ** 2).sum()
+    nw, nsw = np.sum(w), np.sum(w ** 2)
     var = np.multiply((x - m_w) ** 2, w)  # n*d
     var = np.sum(var, axis=0) * (nw / (nw ** 2 - nsw))
     return var
+
+
+def smd_func(x1, w1, x0, w0, abs=True):
+    w_mu1, w_var1 = weighted_mean(x1, w1), weighted_var(x1, w1)
+    w_mu0, w_var0 = weighted_mean(x0, w0), weighted_var(x0, w0)
+    VAR_w = np.sqrt((w_var1 + w_var0) / 2)
+    smd_result = np.divide(
+        (w_mu1 - w_mu0),
+        VAR_w, out=np.zeros_like(w_mu1), where=VAR_w != 0)
+    if abs:
+        smd_result = np.abs(smd_result)
+    return smd_result
 
 
 def cal_deviation(hidden_val, golds_treatment, logits_treatment, normalized, verbose=1):

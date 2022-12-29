@@ -143,6 +143,26 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
     return p_final, orig
 
 
+def shell_for_ml_simulation(model, niter=10, more_para=''):
+    fo = open('simulate_shell_{}.sh'.format(model), 'w')  # 'a'
+    fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
+    r = 0
+    for n in [2000, 4000, 6000]:
+        for train_ratio in [0.8, 0.6]:
+            drug = 'simun{}train{:.2f}'.format(n, train_ratio)
+            for seed in range(0, niter):
+                cmd = "python main_revise_testset_simulate.py --nsim {} --train_ratio {} " \
+                      "--run_model {} --output_dir output/simulate/{}/ --random_seed {} {}" \
+                      "2>&1 | tee output/simulate/{}/log/{}_S{}D267_{}.log\n".format(
+                    n, train_ratio,
+                    model, model, seed, more_para,
+                    model, drug, seed, model)
+                fo.write(cmd)
+                r+=1
+    fo.close()
+    print('In total ', r, ' commands')
+
+
 def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     fo = open('revise_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
@@ -385,7 +405,8 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
                     sr = []
                     sr_colname = []
                     for c in [col1, col2,
-                              'train_loss', 'train_auc', 'train_max_smd', 'train_max_smd_iptw', 'train_n_unbalanced_feat',
+                              'train_loss', 'train_auc', 'train_max_smd', 'train_max_smd_iptw',
+                              'train_n_unbalanced_feat',
                               'train_n_unbalanced_feat_iptw',
                               'test_loss', 'test_auc', 'test_max_smd', 'test_max_smd_iptw', 'test_n_unbalanced_feat',
                               'test_n_unbalanced_feat_iptw',
@@ -1528,18 +1549,21 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
     c1 = 'val_auc-i'
     c2 = 'train_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
-    c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  #val_loss
+    c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  # val_loss
 
-    idx_auc = dfall['success_rate-'+c1 + '-all_n_unbalanced_feat_iptw'] >= 0.1
-    idx_smd = dfall['success_rate-'+c2 + '-all_n_unbalanced_feat_iptw'] >= 0.1
-    idx = dfall['success_rate-'+c30 + '-all_n_unbalanced_feat_iptw'] >= 0.1
+    idx_auc = dfall['success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'] >= 0.1
+    idx_smd = dfall['success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'] >= 0.1
+    idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'] >= 0.1
 
     print('Total drug trials: ', len(idx))
-    print(r"#df[{}] > 0: ".format('success_rate-'+c1+ '-all_n_unbalanced_feat_iptw'), idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
-    print(r"#df[{}] > 0: ".format('success_rate-'+c2+ '-all_n_unbalanced_feat_iptw'), idx_smd.sum(), '({:.2f}%)'.format(idx_smd.mean() * 100))
-    print(r"#df[{}] > 0: ".format('success_rate-'+c30+ '-all_n_unbalanced_feat_iptw'), idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
+    print(r"#df[{}] > 0: ".format('success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'), idx_auc.sum(),
+          '({:.2f}%)'.format(idx_auc.mean() * 100))
+    print(r"#df[{}] > 0: ".format('success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'), idx_smd.sum(),
+          '({:.2f}%)'.format(idx_smd.mean() * 100))
+    print(r"#df[{}] > 0: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
+          '({:.2f}%)'.format(idx.mean() * 100))
 
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-'+c30+ '-all_n_unbalanced_feat_iptw'], ascending=[False])
+    df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
     # df['nsmd_mean_ci-val_auc_nsmd']
 
     N = len(df)
@@ -1559,9 +1583,9 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
         else:
             idx = rdf['ctrl_type'].notna()
 
-        for ith, c in enumerate([c1,c2,c3]):
-            before = np.array(rdf.loc[idx, c+'-{}_n_unbalanced_feat'.format(datapart)])
-            after = np.array(rdf.loc[idx, c+'-{}_n_unbalanced_feat_iptw'.format(datapart)])
+        for ith, c in enumerate([c1, c2, c3]):
+            before = np.array(rdf.loc[idx, c + '-{}_n_unbalanced_feat'.format(datapart)])
+            after = np.array(rdf.loc[idx, c + '-{}_n_unbalanced_feat_iptw'.format(datapart)])
             change = after - before
             before_med = IQR(before)[0]
             before_iqr = IQR(before)[1:]
@@ -1577,7 +1601,6 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
             change_mean_ci, change_mean_std = bootstrap_mean_ci(change, alpha=0.05)
 
             data[ith].append([drugname, before_mean, after_mean, change_mean])
-
 
     data_df = []
     for d in data:
@@ -1616,7 +1639,7 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
             # plt.annotate(arrow_ends[i], xy=(arrow_ends[i], i+d_pos[igroup]), xytext=(arrow_ends[i]+d_pos[igroup], i+d_pos[igroup]), arrowprops=prop)
 
             ax.arrow(arrow_starts[i],  # x start point
-                     i+d_pos[igroup],  # y start point
+                     i + d_pos[igroup],  # y start point
                      arrow_lengths[i],  # change in x
                      0,  # change in y
                      head_width=0.2,  # arrow head width
@@ -1634,9 +1657,9 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
                        order=data_df[1]['subject'],
                        size=8,
                        color='black',
-                       facecolors="none",jitter=0, alpha=0.7
+                       facecolors="none", jitter=0, alpha=0.7
                        )
-    ax.set_title('before vs. after re-weighting on '+datapart)  # add title
+    ax.set_title('before vs. after re-weighting on ' + datapart)  # add title
     ax.grid(axis='y', color='0.9')  # add a light grid
     if datapart == 'test':
         # ax.set_xlim(75, 150)  # set x axis limits
@@ -1652,11 +1675,12 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
     plt.tight_layout()
     if dump:
         check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}.png'.format(model, contrl_type, datapart, '-log' if log else ''))
-        fig.savefig(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}.pdf'.format(model, contrl_type, datapart, '-log' if log else ''))
+        fig.savefig(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}.png'.format(model, contrl_type, datapart,
+                                                                                    '-log' if log else ''))
+        fig.savefig(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}.pdf'.format(model, contrl_type, datapart,
+                                                                                    '-log' if log else ''))
     plt.show()
     plt.clf()
-
 
 
 def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
@@ -2371,13 +2395,16 @@ if __name__ == '__main__':
     # split_shell_file("revise_testset_shell_LIGHTGBM_save_cohort_all_loose.sh", divide=3, skip_first=1)
     # # return 1
 
+    # 2022-12-29
+    shell_for_ml_simulation('LR', niter=10, more_para='')
+    sys.exit(0)
+
     df_drug = pd.read_csv(
         r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
-        dtype={'drug':str})
-    drug_list = df_drug['drug'].to_list() # + ['6809', '135447'] # metformin, donepezil
+        dtype={'drug': str})
+    drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
     shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
                                 stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
-
 
     # sys.exit(0)
 
@@ -2415,9 +2442,12 @@ if __name__ == '__main__':
     # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
     #                                                datapart='test')
 
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all', datapart='all')
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all', datapart='train')
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all', datapart='test')
+    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
+                                                   datapart='all')
+    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
+                                                   datapart='train')
+    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
+                                                   datapart='test')
 
     sys.exit(0)
 
