@@ -154,6 +154,9 @@ def model_eval_common_simple(X, T, Y, PS_logits, loss=None, normalized=False, ve
     treated_PS, control_PS = y_pred_prob[T == 1], y_pred_prob[T == 0]
     n_treat, n_control = (T == 1).sum(), (T == 0).sum()
 
+    cox_HR_ori, cox_HR = cal_survival_HR_simple(T, PS_logits, Y, normalized)
+    KM_ALL = (np.nan, np.nan, cox_HR_ori, cox_HR)
+
     if verbose:
         print('loss: {}'.format(loss))
         print('treated_weights:',
@@ -164,9 +167,8 @@ def model_eval_common_simple(X, T, Y, PS_logits, loss=None, normalized=False, ve
               pd.Series(treated_PS.flatten()).describe().to_string().replace('\n', ';'))  # stats.describe(treated_PS))
         print('controlled_PS:',
               pd.Series(control_PS.flatten()).describe().to_string().replace('\n', ';'))  # stats.describe(control_PS))
-
-    cox_HR_ori, cox_HR = cal_survival_HR_simple(T, PS_logits, Y, normalized)
-    KM_ALL = (np.nan, np.nan, cox_HR_ori, cox_HR)
+        print('Cox Hazard ratio ori {} (CI: {})'.format(cox_HR_ori[0], cox_HR_ori[1]))
+        print('Cox Hazard ratio iptw {} (CI: {})'.format(cox_HR[0], cox_HR[1]))
 
     return KM_ALL
 
