@@ -683,7 +683,7 @@ if __name__ == "__main__":
             paras_grid = {
                 'max_depth': [3, 4, 5],
                 'learning_rate': np.arange(0.01, 1, 0.25),
-                'num_leaves': np.arange(5, 120, 20),
+                'num_leaves': np.arange(10, 120, 30),
                 'min_child_samples': [200, 250, 300],
                 'random_state': [args.random_seed],
             }
