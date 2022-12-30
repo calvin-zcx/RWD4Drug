@@ -17,19 +17,21 @@ if os.name == 'posix':
         print(err)
 
 import time
-from dataset import *
+# from dataset import *
 import pickle
 import argparse
-from torch.utils.data.sampler import SubsetRandomSampler
+# from torch.utils.data.sampler import SubsetRandomSampler
 from evaluation import *
-import torch.nn.functional as F
+# import torch.nn.functional as F
 from utils import save_model, load_model, check_and_mkdir
 import random
 import pandas as pd
 import json
 import matplotlib.pyplot as plt
 from ipreprocess.utils import load_icd_to_ccw
-from PSModels import mlp, lstm, ml
+# from PSModels import mlp, lstm
+from PSModels import ml
+
 import itertools
 from tqdm import tqdm
 from sklearn.model_selection import KFold

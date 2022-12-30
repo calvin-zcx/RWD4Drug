@@ -2435,9 +2435,9 @@ if __name__ == '__main__':
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=10)
+    results_model_selection_for_ml(model=model, niter=10)
     # # zz
-    # results_model_selection_for_ml_step2(model=model)
+    results_model_selection_for_ml_step2(model=model)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
