@@ -2396,7 +2396,8 @@ if __name__ == '__main__':
     # # return 1
 
     # 2022-12-29
-    shell_for_ml_simulation('LR', niter=10, more_para='')
+    # shell_for_ml_simulation('LR', niter=10, more_para='')
+    shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     sys.exit(0)
 
     df_drug = pd.read_csv(

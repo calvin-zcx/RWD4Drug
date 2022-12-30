@@ -33,7 +33,7 @@ from PSModels import mlp, lstm, ml
 import itertools
 from tqdm import tqdm
 from sklearn.model_selection import KFold
-# import seaborn as sns
+import seaborn as sns
 
 import functools
 from scipy.stats import bernoulli
@@ -227,11 +227,12 @@ if __name__ == "__main__":
     # plot survival time
     data_debug = pd.DataFrame(
         data={'treatment': z, 't2e': T})
-    # fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    # sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, bins=25, stat="percent", common_norm=False)
-    # sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
-    # sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
-    # plt.show()
+    if os.name != 'posix':
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, bins=25, stat="percent", common_norm=False)
+        sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
+        sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
+        plt.show()
 
     # train_ratio = 0.8  # 0.5
     train_ratio = args.train_ratio  # default 0.8
@@ -292,7 +293,7 @@ if __name__ == "__main__":
             paras_grid = {
                 'max_depth': [3, 4, 5],
                 'learning_rate': np.arange(0.01, 1, 0.25),
-                'num_leaves': np.arange(5, 120, 20),
+                'num_leaves': np.arange(10, 120, 30),
                 'min_child_samples': [200, 250, 300],
                 'random_state': [args.random_seed],
             }
