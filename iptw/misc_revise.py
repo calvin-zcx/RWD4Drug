@@ -2397,7 +2397,7 @@ if __name__ == '__main__':
 
     # 2022-12-29
     shell_for_ml_simulation('LR', niter=50, more_para='') #
-    split_shell_file("simulate_shell_LR-server2.sh", divide=3, skip_first=1)
+    split_shell_file("simulate_shell_LR-server2.sh", divide=4, skip_first=1)
 
     # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     sys.exit(0)
