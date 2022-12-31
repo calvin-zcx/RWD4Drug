@@ -387,6 +387,7 @@ def results_model_selection_for_ml(model, niter=10):
                 ('val_max_smd_iptw', 'i', True, True), ('val_n_unbalanced_feat_iptw', 'i', True, True),
                 ('train_auc', 'i', False, True), ('train_loss', 'i', True, True),
                 ('train_max_smd_iptw', 'i', True, True), ('train_n_unbalanced_feat_iptw', 'i', True, True),
+                ('train_n_unbalanced_feat_iptw', 'val_auc', True, True),
                 ('trainval_auc', 'i', False, True), ('trainval_loss', 'i', True, True),
                 ('trainval_max_smd_iptw', 'i', True, True), ('trainval_n_unbalanced_feat_iptw', 'i', True, True),
                 ('trainval_n_unbalanced_feat_iptw', 'val_auc', True, False),
@@ -1495,6 +1496,7 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'].notna()
     df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
     # df = dfall.sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
+    df = dfall
 
     # df['nsmd_mean_ci-val_auc_nsmd']
 
@@ -1643,6 +1645,9 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
 
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'].notna()
     df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
+
+    df = dfall
+
     # df = dfall.sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
 
     # df['nsmd_mean_ci-val_auc_nsmd']
@@ -1665,8 +1670,8 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
             idx = rdf['ctrl_type'].notna()
 
         for ith, c in enumerate([c1, c2, c3]):
-            before = np.array(rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)])
-            after = np.array(rdf.loc[idx, c + '-{}_HR_IPTW'.format(datapart)])
+            before = np.abs(groundtruth - np.array(rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)]))
+            after = np.abs(groundtruth - np.array(rdf.loc[idx, c + '-{}_HR_IPTW'.format(datapart)]))
             change = after - before
             before_med = IQR(before)[0]
             before_iqr = IQR(before)[1:]
@@ -1723,8 +1728,8 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
                      i + d_pos[igroup],  # y start point
                      arrow_lengths[i],  # change in x
                      0,  # change in y
-                     head_width=0.02,  # arrow head width
-                     head_length=0.012,  # arrow head length
+                     head_width=0.1,  # arrow head width
+                     head_length=0.02,  # arrow head length
                      width=0.02,  # arrow stem width
                      fc=colors[igroup],  # arrow fill color
                      ec=colors[igroup]
@@ -1746,11 +1751,13 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
     #     # ax.set_xlim(75, 150)  # set x axis limits
     #     pass
     # else:
-    ax.axvline(x=groundtruth, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    # ax.set_xlim(0.2, 1.1)  # set x axis limits
+    # ax.axvline(x=groundtruth, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
         plt.xscale("log")
-    ax.set_xlabel('Hazard Ratios')  # label the x axis
+    ax.set_xlabel('Bias fo Marginal Hazard Ratio')  # label the x axis
     ax.set_ylabel('Drug Trials')  # label the y axis
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
@@ -2433,12 +2440,12 @@ if __name__ == '__main__':
     # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     # sys.exit(0)
 
-    cohort_dir_name = 'save_cohort_all_loose'
+    # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    results_model_selection_for_ml(model=model, niter=10)
-    # # zz
-    results_model_selection_for_ml_step2(model=model)
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # results_model_selection_for_ml(model=model, niter=10)
+    # # # # # # zz
+    # results_model_selection_for_ml_step2(model=model)
+    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
     # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
@@ -2450,7 +2457,8 @@ if __name__ == '__main__':
     # major plots from 3 methods
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selection( model=model, contrl_type='all')
+
+    bar_plot_model_selection( model=model, contrl_type='all')
 
     # sys.exit(0)
 
@@ -2458,8 +2466,10 @@ if __name__ == '__main__':
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
     #
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=np.exp(-1), datapart='all')
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=np.exp(-1), datapart='train')
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=np.exp(-1), datapart='test')
+    groundtruth = 0.5825198790395473
+    groundtruth = 0.57853
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='all')
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='train')
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='test')
 
     print('Done')

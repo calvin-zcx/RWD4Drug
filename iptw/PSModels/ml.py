@@ -540,12 +540,15 @@ class PropensityEstimator:
             # save re-trained results on the whole (training+val) data, for model selection exp only. Not necessary for later use
             model_retrain = self._model_estimation(para_d, X, T)
             T_pre = model_retrain.predict_proba(X)[:, 1]
+            print('........results on training')
             result_retrain = self._evaluation_effect_helper(X, T, T_pre, Y)
 
             # testing model on the test data, for model selection exp only. Not necessary for later use
             T_test_pre = model_retrain.predict_proba(X_test)[:, 1]
+            print('........results on test')
             result_test = self._evaluation_effect_helper(X_test, T_test, T_test_pre, Y_test)
             T_all_pre = model_retrain.predict_proba(X_all)[:, 1]
+            print('........results on all')
             result_all = self._evaluation_effect_helper(X_all, T_all, T_all_pre, Y_all)
 
             # cross-validation part build train and val results

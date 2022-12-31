@@ -212,12 +212,19 @@ if __name__ == "__main__":
     n_feature = X.shape[1]
     r = 1.8
     a = 2
-    cof = np.log(r)*x1 + np.log(r)*x2 + np.log(r)*x4 + np.log(2.3)*x5**2 + np.log(1.5)* x_h1.sum(axis=1) + np.log(1.1) * x_h2.sum(axis=1) - 5.673 - 1*z
-    # cof = np.log(r)*x1 + np.log(r)*x2 + np.log(r)*x4 + np.log(2.3)*x5**2 - 1*z
+    cof = np.log(r)*x1 + np.log(r)*x2 + np.log(r)*x4 + np.log(2.3)*x5**2 + np.log(1.5)* x_h1.sum(axis=1) + np.log(1.1) * x_h2.sum(axis=1) - 5.673 - 1.*z
+    # cof = np.log(r)*x1 + np.log(r)*x2 + np.log(r)*x4 + np.log(2.3)*x5**2 + np.log(1.5)* x_h1.sum(axis=1) + np.log(1.05) * x_h2.sum(axis=1) - 3.30667 -np.log(0.5)*z
 
-    cof = 1/(np.exp(cof)**(1/a))
-    T = np.random.default_rng().weibull(a, n) * cof * 100
-    Tend = 200
+    # cof = np.log(r)*x1 + np.log(r)*x2 + np.log(r)*x4 + np.log(2.3)*x5**2 - 1*z
+    T = (-np.log(np.random.uniform(0, 1, n)) / np.exp(cof)) **(1/a) * 100
+    # T = np.random.default_rng().weibull(a, n) * cof * 100
+
+    # cof = (1 / np.exp(cof))
+    # T = -np.log(np.random.uniform(0, 1, n)) * cof * 100
+
+    Tend = 200 # np.inf #200
+    print('Tend:', Tend)
+
     Y = T <= Tend
     T_censor = np.copy(T)
     T_censor[T>Tend] = Tend
@@ -231,9 +238,11 @@ if __name__ == "__main__":
         data={'treatment': z, 't2e': T})
     if os.name != 'posix':
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, bins=25, stat="percent", common_norm=False)
+        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, stat="percent", common_norm=False)
         sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
         sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
+        for ax in axes:
+            ax.set_xlim(-1, Tend+20)
         plt.show()
 
     # train_ratio = 0.8  # 0.5

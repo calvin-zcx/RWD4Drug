@@ -109,6 +109,34 @@ def transfer_data(model, dataloader, cuda=True):
         return loss_treatment, golds_treatment, logits_treatment, golds_outcome, original_val
 
 
+def cox_no_weight(golds_treatment, golds_outcome):
+    ones_idx, zeros_idx = np.where(golds_treatment == 1), np.where(golds_treatment == 0)
+    if len(golds_outcome.shape) == 2:
+        treated_outcome, controlled_outcome = golds_outcome[ones_idx, 0], golds_outcome[zeros_idx, 0]
+        treated_outcome[treated_outcome == -1] = 0
+        controlled_outcome[controlled_outcome == -1] = 0
+    else:
+        raise ValueError
+
+    T = golds_outcome[:, 1]
+    treated_t2e, controlled_t2e = T[ones_idx], T[zeros_idx]
+    # cox for hazard ratio
+    cph = CoxPHFitter()
+    event = golds_outcome[:, 0]
+    event[event == -1] = 0
+    cox_data = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment, })
+    try:
+        cph_ori = CoxPHFitter()
+        cox_data_ori = pd.DataFrame({'T': T, 'event': event, 'treatment': golds_treatment})
+        cph_ori.fit(cox_data_ori, 'T', 'event')
+        HR_ori = cph_ori.hazard_ratios_['treatment']
+        CI_ori = np.exp(cph_ori.confidence_intervals_.values.reshape(-1))
+    except:
+        cph_ori = HR_ori = CI_ori = None
+
+    return (HR_ori, CI_ori, cph_ori)
+
+
 def cal_survival_HR_simple(golds_treatment, logits_treatment, golds_outcome, normalized):
     ones_idx, zeros_idx = np.where(golds_treatment == 1), np.where(golds_treatment == 0)
     treated_w, controlled_w = cal_weights(golds_treatment, logits_treatment, normalized)
