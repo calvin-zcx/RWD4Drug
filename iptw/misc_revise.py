@@ -143,14 +143,14 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
     return p_final, orig
 
 
-def shell_for_ml_simulation(model, niter=10, more_para=''):
-    fo = open('simulate_shell_{}-server2.sh'.format(model), 'w')  # 'a'
+def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
+    fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
     r = 0
-    for n in [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
+    for n in [3000, 3500, 4000, 4500, 5000]: #[2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
         for train_ratio in [0.8, 0.6]:
             drug = 'simun{}train{:.2f}'.format(n, train_ratio)
-            for seed in range(0, niter):
+            for seed in range(start, niter):
                 cmd = "python main_revise_testset_simulate.py --nsim {} --train_ratio {} " \
                       "--run_model {} --output_dir output/simulate/{}/ --random_seed {} {}" \
                       "2>&1 | tee output/simulate/{}/log/{}_S{}D267_{}.log\n".format(
@@ -2396,8 +2396,8 @@ if __name__ == '__main__':
     # # return 1
 
     # 2022-12-29
-    shell_for_ml_simulation('LR', niter=50, more_para='') #
-    split_shell_file("simulate_shell_LR-server2.sh", divide=4, skip_first=1)
+    shell_for_ml_simulation('LR', niter=100, start=50, more_para='') #
+    split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
 
     # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     sys.exit(0)
@@ -2413,7 +2413,7 @@ if __name__ == '__main__':
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
     # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 

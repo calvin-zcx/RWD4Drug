@@ -27,7 +27,7 @@ import multipy.fdr as fdr
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 5  # 0 # 10 #5
+MAX_NO_UNBALANCED_FEATURE = 5 #5  # 0 # 10 #5
 # 5
 print('Global MAX_NO_UNBALANCED_FEATURE: ', MAX_NO_UNBALANCED_FEATURE)
 
@@ -1049,6 +1049,8 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
 
     df = dfall.loc[idx, :].sort_values(by=[c3], ascending=[False])
     # df['nsmd_mean_ci-val_auc_nsmd']
+    df = dfall
+
 
     N = len(df)
     top_1 = df.loc[:, c1]  # * 100
@@ -1074,6 +1076,7 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
     paucsmd = np.array(df.loc[:, "p-succes-1-vs-2"])
 
     xlabels = df.loc[:, 'drug_name']
+    xlabels = [x[4:-1] for x in xlabels]
 
     width = 0.45  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
@@ -1106,7 +1109,7 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
     ax.xaxis.grid(False)
     ax.set_xticklabels(xlabels, fontsize=20, rotation=45, ha='right')
     ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
+    ax.set_xlabel("Simulation Settings", fontsize=25)
     # ax.set_ylabel("Prop. of success balancing", fontsize=25)  # Success Rate of Balancing
     ax.set_ylabel("Ratio of success balancing", fontsize=25)  # Success Rate of Balancing
 
@@ -1123,54 +1126,54 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
         else:
             return 'ns'
 
-    # def labelvalue(rects, val, height=None):
-    #     for i, rect in enumerate(rects):
-    #         if height is None:
-    #             h = rect.get_height() * 1.03
-    #         else:
-    #             h = height[i] * 1.03
-    #         ax.text(rect.get_x() + rect.get_width() / 2., h,
-    #                 significance(val[i]),
-    #                 ha='center', va='bottom', fontsize=11)
+    # # def labelvalue(rects, val, height=None):
+    # #     for i, rect in enumerate(rects):
+    # #         if height is None:
+    # #             h = rect.get_height() * 1.03
+    # #         else:
+    # #             h = height[i] * 1.03
+    # #         ax.text(rect.get_x() + rect.get_width() / 2., h,
+    # #                 significance(val[i]),
+    # #                 ha='center', va='bottom', fontsize=11)
+    # #
+    # # labelvalue(rects1, pauc, top_1_ci[:,1])
+    # # labelvalue(rects2, psmd, top_2_ci[:,1])
     #
-    # labelvalue(rects1, pauc, top_1_ci[:,1])
-    # labelvalue(rects2, psmd, top_2_ci[:,1])
-
-    for i, rect in enumerate(rects3):
-        d = 0.02
-        y = np.max([top_3_ci[i, 1], top_2_ci[i, 1], top_1_ci[i, 1]]) * 1.03  # rect.get_height()
-        w = rect.get_width()
-        x = rect.get_x()
-        x1 = x - 2 * w
-        x2 = x - 1 * w
-
-        y1 = top_1_ci[i, 1] * 1.03
-        y2 = top_2_ci[i, 1] * 1.03
-
-        # auc v.s. final
-        l, r = x1, x + w
-        ax.plot([l, l, (l + r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-        ax.plot([(l + r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-        # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-        ax.text((l + r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
-
-        # smd v.s. final
-        l, r = x2 + 0.6 * w, x + w
-        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-        # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-        ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
-
-        # auc v.s. smd
-        l, r = x1, x2 + 0.4 * w
-        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-        # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-        ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
+    # for i, rect in enumerate(rects3):
+    #     d = 0.02
+    #     y = np.max([top_3_ci[i, 1], top_2_ci[i, 1], top_1_ci[i, 1]]) * 1.03  # rect.get_height()
+    #     w = rect.get_width()
+    #     x = rect.get_x()
+    #     x1 = x - 2 * w
+    #     x2 = x - 1 * w
+    #
+    #     y1 = top_1_ci[i, 1] * 1.03
+    #     y2 = top_2_ci[i, 1] * 1.03
+    #
+    #     # auc v.s. final
+    #     l, r = x1, x + w
+    #     ax.plot([l, l, (l + r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
+    #     ax.plot([(l + r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
+    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+    #     ax.text((l + r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
+    #
+    #     # smd v.s. final
+    #     l, r = x2 + 0.6 * w, x + w
+    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
+    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
+    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
+    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
+    #
+    #     # auc v.s. smd
+    #     l, r = x1, x2 + 0.4 * w
+    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
+    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
+    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
 
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
     ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Train-Loss Select', 'Our Strategy'),
-              fontsize=25)  # , bbox_to_anchor=(1.13, 1.01))
+              fontsize=25, loc='upper right')  # , bbox_to_anchor=(1.13, 1.01))
 
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
@@ -1541,7 +1544,7 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
 
-    fig = plt.figure(figsize=(5, 4))
+    fig = plt.figure(figsize=(5, 6))
     # add start points
     ax = sns.stripplot(data=data_df[1],
                        x='before',
@@ -1595,20 +1598,22 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
                        )
     ax.set_title('before vs. after re-weighting on ' + datapart)  # add title
     ax.grid(axis='y', color='0.9')  # add a light grid
-    if datapart == 'test':
-        # ax.set_xlim(75, 150)  # set x axis limits
-        pass
-    elif datapart == 'all':
-        ax.set_xlim(-1, 40)  # set x axis limits
-        ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
-
-    else:
-        ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    # if datapart == 'test':
+    #     # ax.set_xlim(75, 150)  # set x axis limits
+    #     pass
+    # elif datapart == 'all':
+    #     # ax.set_xlim(-1, 40)  # set x axis limits
+    #     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    #
+    # else:
+    #     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    #
+    ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
         plt.xscale("log")
     ax.set_xlabel('No. of unbalanced features')  # label the x axis
-    ax.set_ylabel('Drug Trials')  # label the y axis
+    ax.set_ylabel('Simulation Settings')  # label the y axis
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
     if dump:
@@ -1693,7 +1698,7 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
 
-    fig = plt.figure(figsize=(5, 4))
+    fig = plt.figure(figsize=(5, 6))
     # add start points
     ax = sns.stripplot(data=data_df[1],
                        x='before',
@@ -1757,8 +1762,8 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
 
     if log:
         plt.xscale("log")
-    ax.set_xlabel('Bias fo Marginal Hazard Ratio')  # label the x axis
-    ax.set_ylabel('Drug Trials')  # label the y axis
+    ax.set_xlabel('Bias of marginal hazard ratio')  # label the x axis
+    ax.set_ylabel('Simulation Settings')  # label the y axis
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
     if dump:
@@ -2442,8 +2447,8 @@ if __name__ == '__main__':
 
     # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=10)
-    # # # # # # zz
+    # results_model_selection_for_ml(model=model, niter=50)
+    # # # # # # # zz
     # results_model_selection_for_ml_step2(model=model)
     # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
@@ -2458,16 +2463,18 @@ if __name__ == '__main__':
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
 
-    bar_plot_model_selection( model=model, contrl_type='all')
+    bar_plot_model_selection(model=model, contrl_type='all')
 
     # sys.exit(0)
 
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
-    #
-    groundtruth = 0.5825198790395473
-    groundtruth = 0.57853
+
+    # simulation sample number args.nsim:  1000000
+    # HR 0.5781950897226341 ([0.57651537 0.57987971]) p:0.0
+    # np.exp(-1) 0.36787944117144233
+    groundtruth = 0.5781950897226341
     arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='all')
     arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='train')
     arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='test')
