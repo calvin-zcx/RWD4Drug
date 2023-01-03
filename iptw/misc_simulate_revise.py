@@ -1608,6 +1608,11 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
     # else:
     #     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
     #
+
+    if datapart == 'all':
+        ax.set_xlim(right=35)  # set x axis limits
+        # plt.xlim(right=35)
+
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
@@ -2468,6 +2473,7 @@ if __name__ == '__main__':
     # sys.exit(0)
 
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
+    # sys.exit(0)
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
     arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
 

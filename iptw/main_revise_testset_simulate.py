@@ -238,11 +238,25 @@ if __name__ == "__main__":
         data={'treatment': z, 't2e': T})
     if os.name != 'posix':
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, stat="percent", common_norm=False)
+        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, stat="probability", common_norm=False)
+        axes[0].set_ylabel('T2E Probability')  # label the y axis
+        axes[0].set_xlabel('Time-2-Event')
+
         sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
+        axes[1].set_ylabel('Survival Probability')  # label the y axis
+        axes[1].set_xlabel('Time-2-Event')
+
         sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
+        axes[2].set_ylabel('Cumulative Incidence')  # label the y axis
+        axes[2].set_xlabel('Time-2-Event')
+
         for ax in axes:
             ax.set_xlim(-1, Tend+20)
+        plt.tight_layout()
+        check_and_mkdir(args.output_dir + 'results/fig/')
+        # fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.png')
+        # fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.pdf')
+        print('done')
         plt.show()
 
     # train_ratio = 0.8  # 0.5

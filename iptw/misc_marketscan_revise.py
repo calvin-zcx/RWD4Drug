@@ -1833,8 +1833,8 @@ if __name__ == '__main__':
 
 
     ## 2022-12-26
-    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)  # too slow to get --stats
-    split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan.sh", divide=8, skip_first=1)
+    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)  # too slow to get --stats
+    split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan-01.sh", divide=6, skip_first=1)
     sys.exit(0)
 
     ##
