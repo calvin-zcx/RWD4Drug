@@ -2402,7 +2402,7 @@ if __name__ == '__main__':
     # split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
 
     shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
-    split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=4, skip_first=1)
+    split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=5, skip_first=1)
 
     #
     # # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
