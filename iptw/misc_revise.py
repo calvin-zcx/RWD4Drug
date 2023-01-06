@@ -144,7 +144,9 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
 
 
 def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
-    fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
+    # fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
+    fo = open('simulate_shell_{}-server2.sh'.format(model), 'w')  # 'a'
+
     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
     r = 0
     for n in [3000, 3500, 4000, 4500, 5000]: #[2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
@@ -1661,12 +1663,12 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
                        )
     ax.set_title('before vs. after re-weighting on ' + datapart)  # add title
     ax.grid(axis='y', color='0.9')  # add a light grid
-    if datapart == 'test':
-        # ax.set_xlim(75, 150)  # set x axis limits
-        pass
-    else:
-        ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
-
+    # if datapart == 'test':
+    #     # ax.set_xlim(75, 150)  # set x axis limits
+    #     pass
+    # else:
+    #     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
     if log:
         plt.xscale("log")
     ax.set_xlabel('No. of unbalanced features')  # label the x axis
@@ -2396,24 +2398,28 @@ if __name__ == '__main__':
     # # return 1
 
     # 2022-12-29
-    shell_for_ml_simulation('LR', niter=100, start=50, more_para='') #
-    split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
+    # shell_for_ml_simulation('LR', niter=100, start=50, more_para='') #
+    # split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
 
-    # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
+    shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
+    split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=4, skip_first=1)
+
+    #
+    # # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     sys.exit(0)
-
-    df_drug = pd.read_csv(
-        r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
-        dtype={'drug': str})
-    drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
-    shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
-                                stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
+    #
+    # df_drug = pd.read_csv(
+    #     r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
+    #     dtype={'drug': str})
+    # drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
+    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
+    #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
 
     # sys.exit(0)
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
     # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 

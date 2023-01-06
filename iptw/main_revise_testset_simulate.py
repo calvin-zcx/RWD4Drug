@@ -254,11 +254,12 @@ if __name__ == "__main__":
             ax.set_xlim(-1, Tend+20)
         plt.tight_layout()
         check_and_mkdir(args.output_dir + 'results/fig/')
-        # fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.png')
-        # fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.pdf')
+        fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.png')
+        fig.savefig(args.output_dir + 'results/fig/simulate_data_describe.pdf')
         print('done')
         plt.show()
 
+    # sys.exit(0)
     # train_ratio = 0.8  # 0.5
     train_ratio = args.train_ratio  # default 0.8
     print('train_ratio: ', train_ratio,
@@ -349,6 +350,7 @@ if __name__ == "__main__":
 
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
+
 
 # if __name__ == "__main__":
 #     start_time = time.time()

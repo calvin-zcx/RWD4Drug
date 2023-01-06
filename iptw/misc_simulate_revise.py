@@ -1139,41 +1139,41 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
     # # labelvalue(rects1, pauc, top_1_ci[:,1])
     # # labelvalue(rects2, psmd, top_2_ci[:,1])
     #
-    # for i, rect in enumerate(rects3):
-    #     d = 0.02
-    #     y = np.max([top_3_ci[i, 1], top_2_ci[i, 1], top_1_ci[i, 1]]) * 1.03  # rect.get_height()
-    #     w = rect.get_width()
-    #     x = rect.get_x()
-    #     x1 = x - 2 * w
-    #     x2 = x - 1 * w
-    #
-    #     y1 = top_1_ci[i, 1] * 1.03
-    #     y2 = top_2_ci[i, 1] * 1.03
-    #
-    #     # auc v.s. final
-    #     l, r = x1, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # smd v.s. final
-    #     l, r = x2 + 0.6 * w, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # auc v.s. smd
-    #     l, r = x1, x2 + 0.4 * w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
+    for i, rect in enumerate(rects3):
+        d = 0.02
+        y = np.max([top_3_ci[i, 1], top_2_ci[i, 1], top_1_ci[i, 1]]) * 1.03  # rect.get_height()
+        w = rect.get_width()
+        x = rect.get_x()
+        x1 = x - 2 * w
+        x2 = x - 1 * w
+
+        y1 = top_1_ci[i, 1] * 1.03
+        y2 = top_2_ci[i, 1] * 1.03
+
+        # auc v.s. final
+        l, r = x1, x + w
+        ax.plot([l, l, (l + r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(l + r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
+        # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+        ax.text((l + r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
+
+        # smd v.s. final
+        l, r = x2 + 0.6 * w, x + w
+        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
+        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
+        # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
+        ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
+
+        # auc v.s. smd
+        l, r = x1, x2 + 0.4 * w
+        ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
+        ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
+        # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
+        ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
 
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
     ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Train-Loss Select', 'Our Strategy'),
-              fontsize=25, loc='upper right')  # , bbox_to_anchor=(1.13, 1.01))
+              fontsize=25, loc='center right')  # , bbox_to_anchor=(1.13, 1.01))
 
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
@@ -1610,7 +1610,7 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
     #
 
     if datapart == 'all':
-        ax.set_xlim(right=35)  # set x axis limits
+        ax.set_xlim(right=36)  # set x axis limits
         # plt.xlim(right=35)
 
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
@@ -1763,6 +1763,7 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
     # else:
     # ax.set_xlim(0.2, 1.1)  # set x axis limits
     # ax.axvline(x=groundtruth, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
+    ax.set_xlim(0, 0.25)
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
@@ -1779,6 +1780,7 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
                                                                                     '-log' if log else ''))
     plt.show()
     plt.clf()
+
 
 def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
     dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
@@ -2447,13 +2449,13 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
 if __name__ == '__main__':
     # # 2022-12-29
     # # shell_for_ml_simulation('LR', niter=10, more_para='')
-    # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
+    shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     # sys.exit(0)
 
     # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=50)
-    # # # # # # # zz
+    # results_model_selection_for_ml(model=model, niter=100)
+    # # # # # # # # zz
     # results_model_selection_for_ml_step2(model=model)
     # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
