@@ -144,9 +144,7 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
 
 
 def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
-    # fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
-    fo = open('simulate_shell_{}-server2.sh'.format(model), 'w')  # 'a'
-
+    fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
     r = 0
     for n in [3000, 3500, 4000, 4500, 5000]: #[2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
@@ -199,50 +197,6 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
                           "--controlled_drug {} --run_model {} --output_dir output/revise/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 {} {} " \
                           "2>&1 | tee output/revise/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
-                        cohort_dir_name, drug,
-                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
-                        cohort_dir_name, model, drug, seed, ctrl_type, model)
-                    fo.write(cmd)
-                    n += 1
-
-    fo.close()
-    print('In total ', n, ' commands')
-
-
-def shell_for_ml_selectcov(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('revise_selectcov_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
-    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
-
-    # load others:
-    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
-    added_drug = []
-    for index, row in df.iterrows():
-        rx = row['rxcui']
-        gpi = row['gpi']
-        if pd.notna(rx):
-            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
-            added_drug.extend(rx)
-
-        if pd.notna(gpi):
-            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
-            added_drug.extend(gpi)
-
-    print('len(added_drug): ', len(added_drug))
-    print(added_drug)
-
-    fo.write('mkdir -p output/revise_selectcov/{}/{}/log\n'.format(cohort_dir_name, model))
-    n = 0
-    for x in name_cnt:
-        k, v = x
-        if (v >= min_patients) or (k in added_drug):
-            drug = k.split('.')[0]
-            for ctrl_type in ['random', 'atc']:
-                for seed in range(0, niter):
-                    cmd = "python main_revise_selectcov.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/revise_selectcov/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/revise_selectcov/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
                         ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
@@ -416,7 +370,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -427,10 +381,10 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
-                    df = pd.read_csv(fname + '_ALL-model-select-agg.csv')
+                    df = pd.read_csv(fname + '_ALL-model-select.csv')
                     df.rename(columns=_simplify_col_, inplace=True)
                 except:
-                    print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
+                    print('No file exisits: ', fname + '_ALL-model-select.csv')
                     continue
 
                 selection_configs = [
@@ -618,7 +572,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -830,7 +784,7 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
     check_and_mkdir(dirname + 'results/')
 
     writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), engine='xlsxwriter')
-    for t in ['all', 'random', 'atc']:
+    for t in ['random', 'atc', 'all']:
         results = []
         for drug in drug_list:
             rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
@@ -844,8 +798,8 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
             idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
 
             print('drug: ', drug, drug_name.get(drug, ''), t, 'support:', idx.sum())
-            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum(), idx.mean()]
-            col_name = ['drug', 'drug_name', 'niters', 'support', 'support-ratio']
+            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum()]
+            col_name = ['drug', 'drug_name', 'niters', 'support']
 
             for c in ["n_treat", "n_ctrl", "n_feature"]:  # , 'HR_IPTW', 'HR_IPTW_CI'
                 nv = rdf.loc[idx, c]
@@ -1024,7 +978,7 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
 
 
 def combine_ate_final_LR_with(cohort_dir_name, model):
-    dirname = r'output/revise/{}/LR/'.format(cohort_dir_name)
+    dirname = r'output/{}/LR/'.format(cohort_dir_name)
     df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo-allPvalue.xlsx'.format('LR'),
                           sheet_name=None,
                           dtype=str)
@@ -1147,7 +1101,7 @@ def check_drug_name_code():
 
 
 def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
 
     c1 = 'success_rate-val_auc-i-all_n_unbalanced_feat_iptw'
@@ -1589,7 +1543,7 @@ def bar_plot_model_selectionV2_test(cohort_dir_name, model, contrl_type='random'
 def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contrl_type='random', dump=True,
                                                    colorful=True, datapart='all', log=False):
     # dataset: train, test, all
-    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -2394,95 +2348,32 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
 
 
 if __name__ == '__main__':
-    # check_drug_name_code()
-    # test bootstrap method
-
-    # rvs = stats.norm.rvs(loc=0, scale=10, size=(100, 1))
-    # # ci = bootstrap_mean_ci(rvs)
-    # # p, test_orig = bootstrap_mean_pvalue(rvs, expected_mean=0., B=1000)
-    #
-    # rvs2 = stats.norm.rvs(loc=0, scale=10, size=(100, 1))
-    # p, test_orig = bootstrap_mean_pvalue_2samples(rvs, rvs2)
 
     with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
-    # shell_for_ml_marketscan_stats_exist(cohort_dir_name='save_cohort_all_loose', model='LR', niter=10)
-
-    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)  # too slow to get --stats
-    # split_shell_file("shell_LR_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
-    #
-    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
-    # split_shell_file("shell_LIGHTGBM_save_cohort_all_loose_marketscan.sh", divide=4, skip_first=1)
-
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50)
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='MLP', niter=50, stats=False)
-    # split_shell_file("shell_MLP_save_cohort_all_loose.sh", divide=4, skip_first=1)
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False,
-    #              more_para='--epochs 10 --batch_size 128')
-    # split_shell_file("shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
-
-    # 2022-12-22
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
-    # split_shell_file("revise_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    # split_shell_file("revise_testset_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    # 2023-1-09 collider exp
-    shell_for_ml_selectcov(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
-    split_shell_file("revise_selectcov_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    sys.exit(0)
-    #
-    # df_drug = pd.read_excel(
-    #     r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
-    #     'all', dtype={'drug':str})
-    # drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
-    #
-    # # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False)
-    # # split_shell_file("revise_shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
-    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
-    # split_shell_file("revise_testset_shell_LIGHTGBM_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    # # return 1
-
-    # 2022-12-29
-    # shell_for_ml_simulation('LR', niter=100, start=50, more_para='') #
-    # split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
-
-    # shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
-    # split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=5, skip_first=1)
-
-    #
-    # # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
-    # sys.exit(0)
-    #
-    # df_drug = pd.read_csv(
-    #     r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
-    #     dtype={'drug': str})
-    # drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
-    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
-    #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
-
-    # sys.exit(0)
-
     cohort_dir_name = 'save_cohort_all_loose'
-    model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    model = 'LIGHTGBM'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+
+
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
-    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
+    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
 
-    zz
     #
+    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
     #
     # major plots from 3 methods
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
+    # zz
     # sys.exit(0)
 
     # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
@@ -2507,7 +2398,6 @@ if __name__ == '__main__':
                                                    datapart='test')
 
     sys.exit(0)
-
     #
     box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')

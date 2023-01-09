@@ -143,24 +143,24 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
     return p_final, orig
 
 
-def shell_for_ml_simulation(model, niter=10, more_para=''):
-    fo = open('simulate_shell_{}.sh'.format(model), 'w')  # 'a'
-    fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
-    r = 0
-    for n in [2000, 4000, 6000]:
-        for train_ratio in [0.8, 0.6]:
-            drug = 'simun{}train{:.2f}'.format(n, train_ratio)
-            for seed in range(0, niter):
-                cmd = "python main_revise_testset_simulate.py --nsim {} --train_ratio {} " \
-                      "--run_model {} --output_dir output/simulate/{}/ --random_seed {} {}" \
-                      "2>&1 | tee output/simulate/{}/log/{}_S{}D267_{}.log\n".format(
-                    n, train_ratio,
-                    model, model, seed, more_para,
-                    model, drug, seed, model)
-                fo.write(cmd)
-                r += 1
-    fo.close()
-    print('In total ', r, ' commands')
+# def shell_for_ml_simulation(model, niter=10, more_para=''):
+#     fo = open('simulate_shell_{}.sh'.format(model), 'w')  # 'a'
+#     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
+#     r = 0
+#     for n in [2000, 4000, 6000]:
+#         for train_ratio in [0.8, 0.6]:
+#             drug = 'simun{}train{:.2f}'.format(n, train_ratio)
+#             for seed in range(0, niter):
+#                 cmd = "python main_revise_testset_simulate.py --nsim {} --train_ratio {} " \
+#                       "--run_model {} --output_dir output/simulate/{}/ --random_seed {} {}" \
+#                       "2>&1 | tee output/simulate/{}/log/{}_S{}D267_{}.log\n".format(
+#                     n, train_ratio,
+#                     model, model, seed, more_para,
+#                     model, drug, seed, model)
+#                 fo.write(cmd)
+#                 r += 1
+#     fo.close()
+#     print('In total ', r, ' commands')
 
 
 def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
