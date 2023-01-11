@@ -228,7 +228,6 @@ def shell_for_ml_marketscan_selectcov(cohort_dir_name, model, niter=50, min_pati
     print('len(added_drug): ', len(added_drug))
     print(added_drug)
 
-
     fo = open('revise_selectcov_shell_{}_{}_marketscan.sh'.format(model, cohort_dir_name), 'w')  # 'a'
 
     fo.write('mkdir -p output_marketscan/revise_selectcov/{}/{}/log\n'.format(cohort_dir_name, model))
@@ -244,6 +243,54 @@ def shell_for_ml_marketscan_selectcov(cohort_dir_name, model, niter=50, min_pati
                           "--controlled_drug {} --run_model {} --output_dir output_marketscan/revise_selectcov/{}/{}/ --random_seed {} " \
                           "--drug_coding gpi --med_code_topk 200 {} {} " \
                           "2>&1 | tee output_marketscan/revise_selectcov/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n_cmd += 1
+
+    fo.close()
+    print('In total ', n_drug, 'dugs ', n_cmd, ' commands')
+
+
+def shell_for_ml_marketscan_5yrs(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para='',
+                                 selected=[]):
+    cohort_size = pickle.load(
+        open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+            added_drug.extend(gpi)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo = open('revise_f5yrs_shell_{}_{}_marketscan.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+
+    fo.write('mkdir -p output_marketscan/revise_f5yrs/{}/{}/log\n'.format(cohort_dir_name, model))
+    n_cmd = n_drug = 0
+    for x in name_cnt:
+        k, v = x
+        drug = k.split('.')[0]
+        if ((not selected) and ((v >= min_patients) or (k in added_drug))) or (selected and (drug in selected)):
+            n_drug += 1
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main_revise.py --data_dir ../ipreprocess/output_marketscan/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output_marketscan/revise_f5yrs/{}/{}/ --random_seed {} " \
+                          "--drug_coding gpi --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output_marketscan/revise_f5yrs/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
                         ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
@@ -714,12 +761,14 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
     print()
 
 
-def results_ATE_for_ml(cohort_dir_name, model, niter=50):
+def results_ATE_for_ml(exp_dir, cohort_dir_name, model, niter=50):
     cohort_size = pickle.load(
         open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output_marketscan/revise/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
+    print('dirname:', dirname)
+
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -754,12 +803,14 @@ def results_ATE_for_ml(cohort_dir_name, model, niter=50):
     print('Done')
 
 
-def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
+def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(
         open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output_marketscan/revise/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
+    print('dirname:', dirname)
+
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -897,8 +948,10 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
     print()
 
 
-def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
-    dirname = r'output_marketscan/revise/{}/{}/'.format(cohort_dir_name, model)
+def results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model):
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
+    print('dirname:', dirname)
+
     df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), sheet_name=None,
                            dtype={'drug': str})
     writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model),
@@ -2208,17 +2261,24 @@ if __name__ == '__main__':
         print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
 
     ## 2023-1-10 collider shells
-    drug_id_gpi = ['49270070', '72600030',  '39400010', '44201010', '42200032', '49270060', '01200010']
-    shell_for_ml_marketscan_selectcov(
-        cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False, selected=drug_id_gpi)
-    split_shell_file("revise_selectcov_shell_LR_save_cohort_all_loose_marketscan.sh", divide=3, skip_first=1)
+    # drug_id_gpi = ['49270070', '72600030',  '39400010', '44201010', '42200032', '49270060', '01200010']
+    # shell_for_ml_marketscan_selectcov(
+    #     cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False, selected=drug_id_gpi)
+    # split_shell_file("revise_selectcov_shell_LR_save_cohort_all_loose_marketscan.sh", divide=3, skip_first=1)
+    # sys.exit(0)
+
+    ## 2023-1-11 5 years followup
+    drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '01200010']
+    shell_for_ml_marketscan_5yrs(
+        cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi)
+    split_shell_file("revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_marketscan.sh", divide=3, skip_first=1)
     sys.exit(0)
 
     ## 2022-12-26
-    shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
-                            stats=False)  # too slow to get --stats
-    split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan-01.sh", divide=6, skip_first=1)
-    sys.exit(0)
+    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
+    #                         stats=False)  # too slow to get --stats
+    # split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan-01.sh", divide=6, skip_first=1)
+    # sys.exit(0)
 
     ##
     cohort_dir_name = 'save_cohort_all_loose'
@@ -2227,9 +2287,11 @@ if __name__ == '__main__':
     # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
-    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
+    # exp_dir = r'output_marketscan/revise'  # main analysis
+    exp_dir = r'output_marketscan/revise_selectcov'  # sensitivity analysis
+    results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model)
 
     zz
     # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first

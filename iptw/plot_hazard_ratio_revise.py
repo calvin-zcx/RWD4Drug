@@ -147,6 +147,66 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
     plt.close()
 
 
+def plot_forest_for_drug_selectcov(drug_id, drug_id_gpi, drug_name):
+    output_dir = r'plots/hazard_ratio_revise_selectcov/'
+    df_fl = pd.read_excel('output/revise_selectcov/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo_fl.xlsx',
+                          sheet_name=None,
+                          dtype={'drug': str})
+
+    df_ms = pd.read_excel(
+        'output_marketscan/revise_selectcov/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo_ms.xlsx',
+        sheet_name=None,
+        dtype={'drug': str})
+
+    labs = ['FL-All', 'FL-Rand', 'FL-ATC', 'MS-All', 'MS-Rand', 'MS-ATC']
+    measure = []
+    lower = []
+    upper = []
+
+    for sheet in ['all', 'random', 'atc']:
+        df = df_fl[sheet].set_index('drug')
+        v = df.loc[drug_id, 'mean-HR_IPTW']
+        ci = stringlist_2_list(df.loc[drug_id, 'mean_ci-HR_IPTW'])
+        measure.append(v)
+        lower.append(ci[0])
+        upper.append(ci[1])
+
+    for sheet in ['all', 'random', 'atc']:
+        df = df_ms[sheet].set_index('drug')
+        v = df.loc[drug_id_gpi, 'mean-HR_IPTW']
+        ci = stringlist_2_list(df.loc[drug_id_gpi, 'mean_ci-HR_IPTW'])
+        measure.append(v)
+        lower.append(ci[0])
+        upper.append(ci[1])
+
+    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper)
+    p.labels(effectmeasure='HR')
+    # p.labels(scale='log')
+
+    # '#F65453', '#82A2D3'
+    c = ['#870001', '#F65453', '#fcb2ab', '#003396', '#5494DA','#86CEFA']
+    p.colors(pointshape="s", errorbarcolor=c,  pointcolor=c)
+    ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.1, min_value=0.45, decimal=2)
+    # plt.title(drug_name, loc="right", x=.7, y=1.045) #"Random Effect Model(Risk Ratio)"
+    plt.title(drug_name, loc="center", x=-0.5, y=1.045)
+    # plt.suptitle("Missing Data Imputation Method", x=-0.1, y=0.98)
+    # ax.set_xlabel("Favours Control      Favours Haloperidol       ", fontsize=10)
+    ax.set_yticklabels(labs, fontsize=13)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['left'].set_visible(False)
+    # plt.tight_layout()
+
+    check_and_mkdir(output_dir)
+    plt.savefig(output_dir + '{}_{}_forest.png'.format(drug_id, drug_name), bbox_inches='tight')
+    plt.savefig(output_dir + '{}_{}_forest.pdf'.format(drug_id, drug_name), bbox_inches='tight', transparent=True)
+    plt.show()
+    # plt.clf()
+    plt.close()
+
+
 if __name__ == '__main__':
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
@@ -162,7 +222,10 @@ if __name__ == '__main__':
     # results_extract('output', cohort_dir_name, model, drug_id)
     # results_extract('output_marketscan', cohort_dir_name, model, drug_id_gpi)
 
+    # for idx in range(len(drug_id)):
+    #     plot_forest_for_drug(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
+
     for idx in range(len(drug_id)):
-        plot_forest_for_drug(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
+        plot_forest_for_drug_selectcov(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
 
     print('Done')

@@ -295,6 +295,45 @@ def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min
     print('In total ', n, ' commands')
 
 
+def shell_for_ml_selected_drugs_5yrs(drug_list, cohort_dir_name, model, niter=50, min_patients=500, stats=True,
+                                     more_para='', folder='revise_f5yrs'):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    fo = open('revise_f5yrs_shell_{}_{}_selected.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    # df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for rx in drug_list:
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo.write('mkdir -p output/{}/{}/{}/log\n'.format(folder, cohort_dir_name, model))
+    n = 0
+    for x in name_cnt:
+        k, v = x
+        if k in added_drug:
+            drug = k.split('.')[0]
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/{}/{}/{}/ --random_seed {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output/{}/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, folder, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        folder, cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n += 1
+
+    fo.close()
+    print('In total ', n, ' commands')
+
+
 def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(
         open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
@@ -1165,7 +1204,7 @@ def _get_no_unbalanced_iptw(dirname, drug, ctrl_type):
     vn_balanced = rdf.loc[idx_balanced, "n_unbalanced_feature_IPTW"]
     vn_all = rdf.loc[idx, "n_unbalanced_feature_IPTW"]
 
-    print(dirname, drug, 'len(vn_all)', len(vn_all), 'len(vn_balanced)', len(vn_balanced),)
+    print(dirname, drug, 'len(vn_all)', len(vn_all), 'len(vn_balanced)', len(vn_balanced), )
     return vn_all, vn_balanced
 
 
@@ -1245,10 +1284,13 @@ def combine_balance_performance_LR_deep(sheet='all', drug_list=None):
             if key not in drug_list:
                 continue
         ## add test here, compared unbalanced feature after iptw, p-value
-        vn_all_lr, vn_balanced_lr = _get_no_unbalanced_iptw('output/revise_testset/save_cohort_all_loose/LR/results/', key, sheet)
-        vn_all_gbm, vn_balanced_gbm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LIGHTGBM/results/', key, sheet)
+        vn_all_lr, vn_balanced_lr = _get_no_unbalanced_iptw('output/revise_testset/save_cohort_all_loose/LR/results/',
+                                                            key, sheet)
+        vn_all_gbm, vn_balanced_gbm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LIGHTGBM/results/', key,
+                                                              sheet)
         vn_all_mlp, vn_balanced_mlp = _get_no_unbalanced_iptw('output/save_cohort_all_loose/MLP/results/', key, sheet)
-        vn_all_lstm, vn_balanced_lstm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LSTM/results/', key, sheet)
+        vn_all_lstm, vn_balanced_lstm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LSTM/results/', key,
+                                                                sheet)
 
         pgbm, test_origgbm = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_gbm)
         pgbm_balanced, test_origgbm_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_gbm)
@@ -1279,7 +1321,6 @@ def combine_balance_performance_LR_deep(sheet='all', drug_list=None):
         data.append(row2)
         data.append(row3)
         data.append(row4)
-
 
     df_final = pd.DataFrame(data=data)  # , columns=col_name
     df_final.to_excel(writer, sheet_name=sheet)
@@ -2652,7 +2693,15 @@ if __name__ == '__main__':
     # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
     #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
 
-    # sys.exit(0)
+    # 2023-1-11
+    drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
+    shell_for_ml_selected_drugs_5yrs(
+        drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,
+        stats=False)
+    split_shell_file('revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_selected.sh', divide=3, skip_first=1)
+
+
+    sys.exit(0)
 
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
@@ -2660,8 +2709,8 @@ if __name__ == '__main__':
     # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
-
-    exp_dir = r'output/revise'
+    # exp_dir = r'output/revise'   # main results
+    exp_dir = r'output/revise_selectcov'  # sensitivity analysis
     results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
     results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
     results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')
@@ -2699,14 +2748,12 @@ if __name__ == '__main__':
     # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM',
     #                                    selected_balanced=False)
 
-
-#
+    #
     df_lr = pd.read_excel(
         'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo.xlsx',
         sheet_name='all', dtype={'drug': str})
     drug_list = df_lr['drug'].to_list()
     combine_balance_performance_LR_deep(sheet='all', drug_list=drug_list)
-
     zz
     #
     #
