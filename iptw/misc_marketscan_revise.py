@@ -26,7 +26,7 @@ from tqdm import tqdm
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 0
+MAX_NO_UNBALANCED_FEATURE = 1
 MIN_SUCCESS_RATE = 0.1  # 0.1  # 0.5 # 0.1   # 0.1
 MIN_SUPPORT = MIN_SUCCESS_RATE * 100
 # 5
@@ -819,6 +819,8 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name):
     for t in ['all', 'random', 'atc']:
         results = []
         for drug in drug_list:
+            if drug == '22100045':
+                print('22100045')
             rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
 
             if t != 'all':
@@ -2268,11 +2270,11 @@ if __name__ == '__main__':
     # sys.exit(0)
 
     ## 2023-1-11 5 years followup
-    drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '01200010']
-    shell_for_ml_marketscan_5yrs(
-        cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi)
-    split_shell_file("revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_marketscan.sh", divide=3, skip_first=1)
-    sys.exit(0)
+    # drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '01200010']
+    # shell_for_ml_marketscan_5yrs(
+    #     cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi)
+    # split_shell_file("revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_marketscan.sh", divide=3, skip_first=1)
+    # sys.exit(0)
 
     ## 2022-12-26
     # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
@@ -2280,15 +2282,23 @@ if __name__ == '__main__':
     # split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan-01.sh", divide=6, skip_first=1)
     # sys.exit(0)
 
-    ##
-    cohort_dir_name = 'save_cohort_all_loose'
-    model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50, figdump=False)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-
+    ## primary and sensitivity analysis
+    # cohort_dir_name = 'save_cohort_all_loose'
+    # model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    # # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50, figdump=False)
+    # # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    #
     # exp_dir = r'output_marketscan/revise'  # main analysis
-    exp_dir = r'output_marketscan/revise_selectcov'  # sensitivity analysis
+    # # exp_dir = r'output_marketscan/revise_selectcov'  # sensitivity analysis
+    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model)
+
+    # 2023-1-12, 5 yrs followup sensitivity
+    cohort_dir_name = 'save_cohort_all_loose_f5yrs'
+    model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    exp_dir = r'output_marketscan/revise_f5yrs'  # main analysis
     results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model=model, niter=50)
     results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model)

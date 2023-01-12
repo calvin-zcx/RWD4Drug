@@ -2694,23 +2694,33 @@ if __name__ == '__main__':
     #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
 
     # 2023-1-11
-    drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
-    shell_for_ml_selected_drugs_5yrs(
-        drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,
-        stats=False)
-    split_shell_file('revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_selected.sh', divide=3, skip_first=1)
+    # drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
+    # shell_for_ml_selected_drugs_5yrs(
+    #     drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,
+    #     stats=False)
+    # split_shell_file('revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_selected.sh', divide=3, skip_first=1)
+    #
+    #
+    # sys.exit(0)
+
+    ## primary and sensitivity analysis
+    # cohort_dir_name = 'save_cohort_all_loose'
+    # model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    # # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    # # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    #
+    # # exp_dir = r'output/revise'   # main results
+    # exp_dir = r'output/revise_selectcov'  # sensitivity analysis
+    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
+    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
+    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')
 
 
-    sys.exit(0)
-
-    cohort_dir_name = 'save_cohort_all_loose'
+    # 2023-1-12, 5 yrs followup sensitivity
+    cohort_dir_name = 'save_cohort_all_loose_f5yrs'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-
-    # exp_dir = r'output/revise'   # main results
-    exp_dir = r'output/revise_selectcov'  # sensitivity analysis
+    exp_dir = r'output/revise_f5yrs'  # sensitivity analysis
     results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
     results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
     results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')

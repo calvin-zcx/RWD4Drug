@@ -160,6 +160,9 @@ if __name__ == '__main__':
     drug_label = ['pantoprazole', 'gabapentin', 'acetaminophen', 'atorvastatin']
     drug_id_gpi = ['49270070', '72600030', '65991702', '39400010']
 
+
+    #
+
     results_extract('output', cohort_dir_name, model, drug_id)
     # results_extract('output_marketscan', cohort_dir_name, model, drug_id_gpi)
     for idx in range(len(drug_id)):
