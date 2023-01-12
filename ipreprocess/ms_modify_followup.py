@@ -112,6 +112,7 @@ if __name__ == '__main__':
         print('drug:', drug)
         triples = pickle.load(open(source_dir + drug + '.pkl', 'rb'))
         triples_new = []
+        n_changed = 0
         for triple in triples:
             patient, covs, outcome_ = triple
             outcome, outcome_t2e = outcome_
@@ -130,15 +131,18 @@ if __name__ == '__main__':
             # if outcome == 1:
             #     print(outcome_t2e, ad1st_date, index_date, drug_dates[-1])
             #
-            # if (outcome == 0) and (flg == 1):
-            #     print(outcome_t2e, ad1st_date, index_date, drug_dates[-1])
-            #     print('-->', t2event)
+            if (outcome == 0) and (flg == 1):
+                print(outcome_t2e, ad1st_date, index_date, drug_dates[-1])
+                print('-->', t2event)
+                n_changed += 1
 
             triple_new = (patient, covs, (flg, t2event))
             triples_new.append(triple_new)
 
+        print('n_changed:', n_changed)
+
         if not os.path.exists(args.save_cohort_all):
             os.makedirs(args.save_cohort_all)
-        pickle.dump(triples, open(args.save_cohort_all + drug + '.pkl', 'wb'))
+        pickle.dump(triples_new, open(args.save_cohort_all + drug + '.pkl', 'wb'))
 
     print('Done')
