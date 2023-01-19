@@ -2449,14 +2449,14 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
 if __name__ == '__main__':
     # # 2022-12-29
     # # shell_for_ml_simulation('LR', niter=10, more_para='')
-    shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
+    # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
     # sys.exit(0)
 
     # cohort_dir_name = 'save_cohort_all_loose'
-    model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=100)
+    model = 'LIGHTGBM'  #'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    results_model_selection_for_ml(model=model, niter=100)
     # # # # # # # # zz
-    # results_model_selection_for_ml_step2(model=model)
+    results_model_selection_for_ml_step2(model=model)
     # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
     # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)

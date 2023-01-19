@@ -106,6 +106,9 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
     lower = []
     upper = []
 
+    npos = []
+    nneg = []
+
     for sheet in ['all', 'random', 'atc']:
         df = df_fl[sheet].set_index('drug')
         v = df.loc[drug_id, 'mean-HR_IPTW']
@@ -113,6 +116,9 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
         measure.append(v)
         lower.append(ci[0])
         upper.append(ci[1])
+
+        npos.append(df.loc[drug_id, 'n_treat'])
+        nneg.append(df.loc[drug_id, 'n_ctrl'])
 
     for sheet in ['all', 'random', 'atc']:
         df = df_ms[sheet].set_index('drug')
@@ -122,12 +128,19 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
         lower.append(ci[0])
         upper.append(ci[1])
 
-    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper)
-    p.labels(effectmeasure='HR')
+        npos.append(df.loc[drug_id_gpi, 'n_treat'])
+        nneg.append(df.loc[drug_id_gpi, 'n_ctrl'])
+
+    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper,
+                          ncumIncidence=npos, nabs=nneg)
+
+    p.labels(effectmeasure='aHR', add_label1='#Treated', add_label2='#Contrl')
     # '#F65453', '#82A2D3'
     c = ['#870001', '#F65453', '#fcb2ab', '#003396', '#5494DA', '#86CEFA']
     p.colors(pointshape="s", errorbarcolor=c, pointcolor=c)
-    ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
+    # ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
+
+    ax = p.plot_with_incidence(figsize=(8.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
     # plt.title(drug_name, loc="right", x=.7, y=1.045) #"Random Effect Model(Risk Ratio)"
     plt.title(drug_name, loc="center", x=-0.5, y=1.045)
     # plt.suptitle("Missing Data Imputation Method", x=-0.1, y=0.98)
@@ -164,6 +177,8 @@ def plot_forest_for_drug_selectcov(drug_id, drug_id_gpi, drug_name):
     measure = []
     lower = []
     upper = []
+    npos = []
+    nneg = []
 
     for sheet in ['all', 'random', 'atc']:
         df = df_fl[sheet].set_index('drug')
@@ -172,6 +187,8 @@ def plot_forest_for_drug_selectcov(drug_id, drug_id_gpi, drug_name):
         measure.append(v)
         lower.append(ci[0])
         upper.append(ci[1])
+        npos.append(df.loc[drug_id, 'n_treat'])
+        nneg.append(df.loc[drug_id, 'n_ctrl'])
 
     for sheet in ['all', 'random', 'atc']:
         df = df_ms[sheet].set_index('drug')
@@ -180,15 +197,20 @@ def plot_forest_for_drug_selectcov(drug_id, drug_id_gpi, drug_name):
         measure.append(v)
         lower.append(ci[0])
         upper.append(ci[1])
+        npos.append(df.loc[drug_id_gpi, 'n_treat'])
+        nneg.append(df.loc[drug_id_gpi, 'n_ctrl'])
 
-    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper)
-    p.labels(effectmeasure='HR')
+    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper,
+                          ncumIncidence=npos, nabs=nneg)
+    p.labels(effectmeasure='aHR', add_label1='#Treated', add_label2='#Contrl')
     # p.labels(scale='log')
 
     # '#F65453', '#82A2D3'
     c = ['#870001', '#F65453', '#fcb2ab', '#003396', '#5494DA', '#86CEFA']
     p.colors(pointshape="s", errorbarcolor=c, pointcolor=c)
-    ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.1, min_value=0.45, decimal=2)
+    # ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.1, min_value=0.45, decimal=2)
+    ax = p.plot_with_incidence(figsize=(8.5, 3), t_adjuster=0.09, max_value=1.1, min_value=0.45, decimal=2)
+
     # plt.title(drug_name, loc="right", x=.7, y=1.045) #"Random Effect Model(Risk Ratio)"
     plt.title(drug_name, loc="center", x=-0.5, y=1.045)
     # plt.suptitle("Missing Data Imputation Method", x=-0.1, y=0.98)
@@ -226,6 +248,8 @@ def plot_forest_for_drug_f5yrs(drug_id, drug_id_gpi, drug_name):
     measure = []
     lower = []
     upper = []
+    npos = []
+    nneg = []
 
     for sheet in ['all', 'random', 'atc']:
         df = df_fl[sheet].set_index('drug')
@@ -234,6 +258,8 @@ def plot_forest_for_drug_f5yrs(drug_id, drug_id_gpi, drug_name):
         measure.append(v)
         lower.append(ci[0])
         upper.append(ci[1])
+        npos.append(df.loc[drug_id, 'n_treat'])
+        nneg.append(df.loc[drug_id, 'n_ctrl'])
 
     for sheet in ['all', 'random', 'atc']:
         df = df_ms[sheet].set_index('drug')
@@ -242,13 +268,18 @@ def plot_forest_for_drug_f5yrs(drug_id, drug_id_gpi, drug_name):
         measure.append(v)
         lower.append(ci[0])
         upper.append(ci[1])
+        npos.append(df.loc[drug_id_gpi, 'n_treat'])
+        nneg.append(df.loc[drug_id_gpi, 'n_ctrl'])
 
-    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper)
-    p.labels(effectmeasure='HR')
+    p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper,
+                          ncumIncidence=npos, nabs=nneg)
+    p.labels(effectmeasure='aHR', add_label1='#Treated', add_label2='#Contrl')
     # '#F65453', '#82A2D3'
     c = ['#870001', '#F65453', '#fcb2ab', '#003396', '#5494DA', '#86CEFA']
     p.colors(pointshape="s", errorbarcolor=c, pointcolor=c)
-    ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
+    # ax = p.plot(figsize=(7.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
+    ax = p.plot_with_incidence(figsize=(8.5, 3), t_adjuster=0.09, max_value=1.2, min_value=0.5, decimal=2)
+
     # plt.title(drug_name, loc="right", x=.7, y=1.045) #"Random Effect Model(Risk Ratio)"
     plt.title(drug_name, loc="center", x=-0.5, y=1.045)
     # plt.suptitle("Missing Data Imputation Method", x=-0.1, y=0.98)
@@ -290,10 +321,9 @@ if __name__ == '__main__':
     # for idx in range(len(drug_id)):
     #     plot_forest_for_drug_selectcov(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
 
-    # drug_label = ['prednisone', 'amoxicillin']
-    # drug_id = ['8640', '723']
-    # drug_id_gpi = ['22100045', '01200010']
-
+    drug_label = ['prednisone', 'amoxicillin']
+    drug_id = ['8640', '723']
+    drug_id_gpi = ['22100045', '01200010']
 
     # for idx in range(len(drug_id)):
     #     plot_forest_for_drug(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
