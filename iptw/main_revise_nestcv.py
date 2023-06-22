@@ -629,7 +629,10 @@ if __name__ == "__main__":
         # model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
         #                                                                         test_t)
 
-        model = ml.PropensityEstimator(args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit(
+        # model = ml.PropensityEstimator(args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit(
+        #     x, t, verbose=0)
+
+        model = ml.PropensityEstimator(args.run_model, paras_grid, random_seed=args.random_seed).nested_cross_validation_fit(
             x, t, verbose=0)
 
         # with open(args.save_model_filename, 'wb') as f:
@@ -641,8 +644,15 @@ if __name__ == "__main__":
         # results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
         #                                                  test_x, test_t, test_y, x, t, y,
         #                                                  drug_name, feature_name, n_feature, dump_ori=False)
-        results_all_list, results_all_df = final_eval_ml_CV_revise(model, args,  x, t, y,
-                                                                   drug_name, feature_name, n_feature, dump_ori=False)
+        results_all_df_kout = []
+        for kout in range(len(model.best_model_nestcv)):
+            results_all_list, results_all_df = final_eval_ml_nestedCV_revise(
+                model, kout, args,  x, t, y, drug_name, feature_name, n_feature, dump_ori=False)
+            results_all_df_kout.append(results_all_df)
+            print('Done kout', kout)
+
+        results_all_df_kout = pd.concat(results_all_df_kout, ignore_index=True)
+        results_all_df_kout.to_csv(args.save_model_filename + '_results-kout-all.csv')
 
     # %%  MLP PS Models
     if args.run_model == 'MLP':

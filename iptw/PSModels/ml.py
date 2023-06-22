@@ -52,17 +52,22 @@ class PropensityEstimator:
         self.best_hyper_paras = None
         self.best_model = None
 
-        self.best_hyper_paras_list_nestcv = []
-        self.best_model_list_nestcv = []
+        self.best_hyper_paras_nestcv = []
+        self.best_model_nestcv = []
 
         self.best_val = float('-inf')
         self.best_balance = float('inf')
+
+        self.best_val_nestcv = []
+        self.best_balance_nestcv = []
 
         self.global_best_val = float('-inf')
         self.global_best_balance = float('inf')
 
         self.best_balance_k_folds_detail = []  # k #(SMD>threshold)
         self.best_val_k_folds_detail = []  # k AUC
+        self.best_balance_k_folds_detail_nestcv = []  # k #(SMD>threshold)
+        self.best_val_k_folds_detail_nestcv = []  # k AUC
 
         self.results = []
         self.results_retrain = []
@@ -605,8 +610,15 @@ class PropensityEstimator:
         # out-of-sample test on the Xtest and Ttest
         :return:
         """
-
         start_time = time.time()
+
+        self.best_hyper_paras_nestcv = [None, ] * kfold_out
+        self.best_model_nestcv = [None, ] * kfold_out
+        self.best_val_nestcv = [float('-inf'), ] * kfold_out
+        self.best_balance_nestcv = [float('inf'), ] * kfold_out
+        self.best_balance_k_folds_detail_nestcv = [None, ] * kfold_out
+        self.best_val_k_folds_detail_nestcv = [None, ] * kfold_out
+
         kf_out = KFold(n_splits=kfold_out, random_state=self.random_seed, shuffle=shuffle)
         kf_in = KFold(n_splits=kfold_in, random_state=self.random_seed, shuffle=shuffle)
 
@@ -626,19 +638,18 @@ class PropensityEstimator:
         # T_test = np.asarray(T_test)
         # X_all = np.concatenate((X, X_test))
         # T_all = np.concatenate((T, T_test))
-        for kout, (trainval_index, test_index) in tqdm(enumerate(kf_out.split(X), 1), total=kfold_out):
+        for kout, (trainval_index, test_index) in tqdm(enumerate(kf_out.split(X), 0), total=kfold_out):
             X_trainval = X[trainval_index, :]
             T_trainval = T[trainval_index]
             X_test = X[test_index, :]
             T_test = T[test_index]
-            # self.best_hyper_paras_list_nestcv = [] add this value
-            # self.best_model_list_nestcv = [] add this value
+
             # what else results need to store?
             for i, para_d in tqdm(enumerate(self.paras_list, 1), total=len(self.paras_list)):
                 i_model_balance_over_kfold = []
                 i_model_fit_over_kfold = []
-                for kin, (train_index, val_index) in enumerate(kf_in.split(X_trainval), 1):
-                    print('{}-th out fold, training {}th (/{}) model {} over the {}th-fold data'.format(
+                for kin, (train_index, val_index) in enumerate(kf_in.split(X_trainval), 0):
+                    print('{}-th out fold, training {}th (/{}) model {} over the {}th-in-fold data'.format(
                         kout, i, len(self.paras_list), para_d, kin))
                     # training and testing datasets:
                     X_train = X_trainval[train_index, :]
@@ -670,22 +681,23 @@ class PropensityEstimator:
                 i_model_balance = [np.mean(i_model_balance_over_kfold), np.std(i_model_balance_over_kfold)]
                 i_model_fit = [np.mean(i_model_fit_over_kfold), np.std(i_model_fit_over_kfold)]
 
-                if (i_model_balance[0] < self.best_balance) or \
-                        ((i_model_balance[0] == self.best_balance) and (i_model_fit[0] > self.best_val)):
+                if (i_model_balance[0] < self.best_balance_nestcv[kout]) or \
+                        ((i_model_balance[0] == self.best_balance_nestcv[kout]) and (i_model_fit[0] > self.best_val_nestcv[kout])):
                     # model with current best configuration re-trained on the whole dataset.
                     # self.best_model = self._model_estimation(para_d, X, T)
                     # we can keep these codes, just global best over k-out fold.
                     # However, this is also depends on sampled datasets, which might be easier to balance
-                    self.best_hyper_paras = para_d
-                    self.best_balance = i_model_balance[0]
-                    self.best_val = i_model_fit[0]
-                    self.best_balance_k_folds_detail = i_model_balance_over_kfold
-                    self.best_val_k_folds_detail = i_model_fit_over_kfold
+                    self.best_hyper_paras_nestcv[kout] = para_d
+                    self.best_balance_nestcv[kout] = i_model_balance[0]
+                    self.best_val_nestcv[kout] = i_model_fit[0]
+                    self.best_balance_k_folds_detail_nestcv[kout] = i_model_balance_over_kfold
+                    self.best_val_k_folds_detail_nestcv[kout] = i_model_fit_over_kfold
 
-                if i_model_fit[0] > self.global_best_val:
+
+                if i_model_fit[0] > self.global_best_val: # global best is not useful here
                     self.global_best_val = i_model_fit[0]
 
-                if i_model_balance[0] < self.global_best_balance:
+                if i_model_balance[0] < self.global_best_balance: # global best is not useful here
                     self.global_best_balance = i_model_balance[0]
 
                 # save re-trained results on the training+val data, for model selection exp only. Not necessary for later use
@@ -701,7 +713,7 @@ class PropensityEstimator:
 
                 # cross-validation part build train and val results
                 # this part build retrain on train+val, test, and all results.
-                self.results_retrain.append((kout, i, 'retrain', para_d) + result_retrain + result_test + result_all)
+                self.results_retrain.append((kout, i, 'retrain on trainval', para_d) + result_retrain + result_test + result_all)
 
                 if verbose:
                     print('Finish training {}th-Out-fold {}th (/{}) model {} over the {}th-In-fold data'.format(
@@ -710,28 +722,31 @@ class PropensityEstimator:
                     print('CV Fit mean, std:', i_model_fit, 'k_folds:', i_model_fit_over_kfold)
                     self.report_stats()
 
-        # end of training
-        print('best model parameter:', self.best_hyper_paras)
-        print('re-training best model on all the data using best model parameter...')
-        # best model is used in predicting ps
-        # retrained here
-        # should we keep all k-fold model, or just the global best?
-        self.best_model = self._model_estimation(self.best_hyper_paras, X, T)
+            # end of training
+            # end of training in kout 2023-6-21
+            print('best model parameter in kout {}:'.format(kout), self.best_hyper_paras_nestcv[kout])
+            print('re-training best model on all the data using best model parameter...')
+            # best model is used in predicting ps
+            # retrained here
+            # should we keep all k-fold model, or just the global best?
+            self.best_model_nestcv[kout] = self._model_estimation(self.best_hyper_paras_nestcv[kout], X, T)
+
         name = ['loss', 'auc', 'max_smd', 'n_unbalanced_feat', 'max_smd_iptw', 'n_unbalanced_feat_iptw']
         col_name = ['fold-k-out', 'i', 'fold-k-in', 'paras'] + [pre + x for pre in ['train_', 'val_', 'beforRetrain trainval_'] for x in
                                                name]
         self.results = pd.DataFrame(self.results, columns=col_name)
         self.results['paras_str'] = self.results['paras'].apply(lambda x: str(x))
 
-        col_name_retrain = ['fold-k-out', 'i', 'fold-k', 'paras'] + [pre + x for pre in ['trainval_', 'test_', 'all_'] for x in name]
+        col_name_retrain = ['fold-k-out', 'i', 'fold-k-in', 'paras'] + [pre + x for pre in ['trainval_', 'test_', 'all_'] for x in name]
         self.results_retrain = pd.DataFrame(self.results_retrain, columns=col_name_retrain)
         self.results_retrain['paras_str'] = self.results_retrain['paras'].apply(lambda x: str(x))
 
-        results_agg = self.results.groupby('paras_str').agg(['mean', 'std']).reset_index().sort_values(
-            by=[('i', 'mean')])
+        results_agg = self.results.drop(columns=['paras']).groupby(['fold-k-out', 'paras_str']).agg(['mean', 'std']).reset_index().sort_values(
+            by=[('fold-k-out', ''), ('i', 'mean')])
         results_agg.columns = results_agg.columns.to_flat_index()
         results_agg.columns = results_agg.columns.map('-'.join)
-        self.results_agg = pd.merge(results_agg, self.results_retrain, left_on='paras_str-', right_on='paras_str',
+        self.results_agg = pd.merge(results_agg, self.results_retrain,
+                                    left_on=['fold-k-out-', 'paras_str-'], right_on=['fold-k-out', 'paras_str'],
                                     how='left')
 
         if verbose:
@@ -761,6 +776,14 @@ class PropensityEstimator:
 
     def predict_loss(self, X, T):
         T_pre = self.predict_ps(X)
+        return log_loss(T, T_pre)
+
+    def predict_ps_nestedCV(self, X, kout):
+        pred_ps = self.best_model_nestcv[kout].predict_proba(X)[:, 1]
+        return pred_ps
+
+    def predict_loss_nestedCV(self, X, T, kout):
+        T_pre = self.predict_ps_nestedCV(X, kout)
         return log_loss(T, T_pre)
 
 # class OutcomeEstimator:
