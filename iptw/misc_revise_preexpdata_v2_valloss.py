@@ -46,9 +46,6 @@ def stringlist_2_list(s):
 
 
 def stringlist_2_str(s, percent=False, digit=-1):
-    if pd.isna(s):
-        # print()
-        return s
     r = s.strip('][').replace(',', ' ').split()
     r = list(map(float, r))
     if percent:
@@ -147,12 +144,10 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
 
 
 def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
-    # fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
-    fo = open('simulate_shell_{}-server2.sh'.format(model), 'w')  # 'a'
-
+    fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
     r = 0
-    for n in [3000, 3500, 4000, 4500, 5000]:  # [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
+    for n in [3000, 3500, 4000, 4500, 5000]: #[2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
         for train_ratio in [0.8, 0.6]:
             drug = 'simun{}train{:.2f}'.format(n, train_ratio)
             for seed in range(start, niter):
@@ -163,14 +158,14 @@ def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
                     model, model, seed, more_para,
                     model, drug, seed, model)
                 fo.write(cmd)
-                r += 1
+                r+=1
     fo.close()
     print('In total ', r, ' commands')
 
 
 def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('revise_nestcv_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    fo = open('revise_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
 
     # load others:
@@ -190,7 +185,7 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
     print('len(added_drug): ', len(added_drug))
     print(added_drug)
 
-    fo.write('mkdir -p output/revise_nestcv/{}/{}/log\n'.format(cohort_dir_name, model))
+    fo.write('mkdir -p output/revise/{}/{}/log\n'.format(cohort_dir_name, model))
     n = 0
     for x in name_cnt:
         k, v = x
@@ -198,54 +193,10 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
             drug = k.split('.')[0]
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, niter):
-                    cmd = "python main_revise_nestcv.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/revise_nestcv/{}/{}/ --random_seed {} " \
+                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/revise/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/revise_nestcv/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
-                        cohort_dir_name, drug,
-                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
-                        cohort_dir_name, model, drug, seed, ctrl_type, model)
-                    fo.write(cmd)
-                    n += 1
-
-    fo.close()
-    print('In total ', n, ' commands')
-
-
-def shell_for_ml_selectcov(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('revise_selectcov_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
-    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
-
-    # load others:
-    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
-    added_drug = []
-    for index, row in df.iterrows():
-        rx = row['rxcui']
-        gpi = row['gpi']
-        if pd.notna(rx):
-            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
-            added_drug.extend(rx)
-
-        if pd.notna(gpi):
-            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
-            added_drug.extend(gpi)
-
-    print('len(added_drug): ', len(added_drug))
-    print(added_drug)
-
-    fo.write('mkdir -p output/revise_selectcov/{}/{}/log\n'.format(cohort_dir_name, model))
-    n = 0
-    for x in name_cnt:
-        k, v = x
-        if (v >= min_patients) or (k in added_drug):
-            drug = k.split('.')[0]
-            for ctrl_type in ['random', 'atc']:
-                for seed in range(0, niter):
-                    cmd = "python main_revise_selectcov.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/revise_selectcov/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/revise_selectcov/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                          "2>&1 | tee output/revise/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
                         cohort_dir_name, drug,
                         ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
                         cohort_dir_name, model, drug, seed, ctrl_type, model)
@@ -282,45 +233,6 @@ def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, niter):
                     cmd = "python main_revise_testset.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
-                          "--controlled_drug {} --run_model {} --output_dir output/{}/{}/{}/ --random_seed {} " \
-                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
-                          "2>&1 | tee output/{}/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
-                        cohort_dir_name, drug,
-                        ctrl_type, model, folder, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
-                        folder, cohort_dir_name, model, drug, seed, ctrl_type, model)
-                    fo.write(cmd)
-                    n += 1
-
-    fo.close()
-    print('In total ', n, ' commands')
-
-
-def shell_for_ml_selected_drugs_5yrs(drug_list, cohort_dir_name, model, niter=50, min_patients=500, stats=True,
-                                     more_para='', folder='revise_f5yrs'):
-    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
-    fo = open('revise_f5yrs_shell_{}_{}_selected.sh'.format(model, cohort_dir_name), 'w')  # 'a'
-    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
-
-    # load others:
-    # df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
-    added_drug = []
-    for rx in drug_list:
-        if pd.notna(rx):
-            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
-            added_drug.extend(rx)
-
-    print('len(added_drug): ', len(added_drug))
-    print(added_drug)
-
-    fo.write('mkdir -p output/{}/{}/{}/log\n'.format(folder, cohort_dir_name, model))
-    n = 0
-    for x in name_cnt:
-        k, v = x
-        if k in added_drug:
-            drug = k.split('.')[0]
-            for ctrl_type in ['random', 'atc']:
-                for seed in range(0, niter):
-                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
                           "--controlled_drug {} --run_model {} --output_dir output/{}/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 {} {} " \
                           "2>&1 | tee output/{}/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
@@ -455,101 +367,157 @@ def _simplify_col_(x):
 
 
 def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
-    """
-        revised based on nestCV, outere fold, as a seperate experiment.
-    """
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise_nestcv/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    for drug in tqdm(drug_list, total=len(drug_list)):
+    for drug in drug_list:
         results = []
         for ctrl_type in ['random', 'atc']:
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
-                    df_allfold = pd.read_csv(fname + '_ALL-model-select-agg.csv')
-                    df_allfold.rename(columns=_simplify_col_, inplace=True)
+                    df = pd.read_csv(fname + '_ALL-model-select.csv')
+                    df.rename(columns=_simplify_col_, inplace=True)
                 except:
-                    print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
+                    print('No file exisits: ', fname + '_ALL-model-select.csv')
                     continue
-                for kout in range(10):  # added loop for nest CV
-                    df = df_allfold.loc[df_allfold['fold-k-out-'] == kout, :]
-                    selection_configs = [
-                        ('val_auc', 'i', False, True), ('val_loss', 'i', True, True),
-                        ('val_max_smd_iptw', 'i', True, True), ('val_n_unbalanced_feat_iptw', 'i', True, True),
-                        ('train_auc', 'i', False, True), ('train_loss', 'i', True, True),
-                        ('train_max_smd_iptw', 'i', True, True), ('train_n_unbalanced_feat_iptw', 'i', True, True),
-                        ('trainval_auc', 'i', False, True), ('trainval_loss', 'i', True, True),
-                        ('trainval_max_smd_iptw', 'i', True, True),
-                        ('trainval_n_unbalanced_feat_iptw', 'i', True, True),
-                        ('trainval_n_unbalanced_feat_iptw', 'val_auc', True, False),
-                        ('trainval_n_unbalanced_feat_iptw', 'val_loss', True, True)
-                    ]
-                    selection_results = []
-                    selection_results_colname = []
-                    for col1, col2, order1, order2 in selection_configs:
-                        # print('col1, col2, ascending order1, order2:', col1, col2, order1, order2)
-                        dftmp = df.sort_values(by=[col1, col2], ascending=[order1, order2])
-                        sr = []
-                        sr_colname = []
-                        for c in [col1, col2,
-                                  'train_loss', 'train_auc', 'train_max_smd', 'train_max_smd_iptw',
-                                  'train_n_unbalanced_feat',
-                                  'train_n_unbalanced_feat_iptw',
-                                  'test_loss', 'test_auc', 'test_max_smd', 'test_max_smd_iptw',
-                                  'test_n_unbalanced_feat',
-                                  'test_n_unbalanced_feat_iptw',
-                                  'all_loss', 'all_auc', 'all_max_smd', 'all_max_smd_iptw', 'all_n_unbalanced_feat',
-                                  'all_n_unbalanced_feat_iptw',
-                                  'train_reduction_n_unbalance', 'train_reduction_n_unbalance_percent',
-                                  'test_reduction_n_unbalance', 'test_reduction_n_unbalance_percent',
-                                  'all_reduction_n_unbalance', 'all_reduction_n_unbalance_percent']:
-                            # print(c)
-                            if c == 'all_reduction_n_unbalance':
-                                sr.append(dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] -
-                                          dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')])
-                            elif c == 'test_reduction_n_unbalance':
-                                sr.append(dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] -
-                                          dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')])
-                            elif c == 'train_reduction_n_unbalance':
-                                sr.append(dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')] -
-                                          dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')])
-                            elif c == 'all_reduction_n_unbalance_percent':
-                                delta = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] - \
-                                        dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
-                                denom = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')]
-                                per = delta / denom if denom != 0 else 0
-                                sr.append(per)
-                            elif c == 'test_reduction_n_unbalance_percent':
-                                delta = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] - \
-                                        dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')]
-                                denom = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')]
-                                per = delta / denom if denom != 0 else 0
-                                sr.append(per)
-                            elif c == 'train_reduction_n_unbalance_percent':
-                                delta = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')] - \
-                                        dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
-                                denom = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')]
-                                per = delta / denom if denom != 0 else 0
-                                sr.append(per)
-                            else:
-                                sr.append(dftmp.iloc[0, dftmp.columns.get_loc(c)])
-                            if (c in [col1, col2]) and (c != 'i'):
-                                sr_colname.append(c)
-                            else:
-                                sr_colname.append('{}-{}-{}'.format(col1, col2, c))
-                        selection_results.extend(sr)
-                        selection_results_colname.extend(sr_colname)
 
-                    results.append(
-                        ["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type, kout] + selection_results)
+                selection_configs = [
+                    ('val_auc', 'i', False, True), ('val_loss', 'i', True, True),
+                    ('val_max_smd_iptw', 'i', True, True), ('val_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('train_auc', 'i', False, True), ('train_loss', 'i', True, True),
+                    ('train_max_smd_iptw', 'i', True, True), ('train_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('trainval_auc', 'i', False, True), ('trainval_loss', 'i', True, True),
+                    ('trainval_max_smd_iptw', 'i', True, True), ('trainval_n_unbalanced_feat_iptw', 'i', True, True),
+                    ('trainval_n_unbalanced_feat_iptw', 'val_auc', True, False),
+                    ('trainval_n_unbalanced_feat_iptw', 'val_loss', True, True)
+                ]
+                selection_results = []
+                selection_results_colname = []
+                for col1, col2, order1, order2 in selection_configs:
+                    # print('col1, col2, ascending order1, order2:', col1, col2, order1, order2)
+                    dftmp = df.sort_values(by=[col1, col2], ascending=[order1, order2])
+                    sr = []
+                    sr_colname = []
+                    for c in [col1, col2,
+                              'train_loss', 'train_auc', 'train_max_smd', 'train_max_smd_iptw',
+                              'train_n_unbalanced_feat',
+                              'train_n_unbalanced_feat_iptw',
+                              'test_loss', 'test_auc', 'test_max_smd', 'test_max_smd_iptw', 'test_n_unbalanced_feat',
+                              'test_n_unbalanced_feat_iptw',
+                              'all_loss', 'all_auc', 'all_max_smd', 'all_max_smd_iptw', 'all_n_unbalanced_feat',
+                              'all_n_unbalanced_feat_iptw',
+                              'train_reduction_n_unbalance', 'train_reduction_n_unbalance_percent',
+                              'test_reduction_n_unbalance', 'test_reduction_n_unbalance_percent',
+                              'all_reduction_n_unbalance', 'all_reduction_n_unbalance_percent']:
+                        # print(c)
+                        if c == 'all_reduction_n_unbalance':
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] -
+                                      dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')])
+                        elif c == 'test_reduction_n_unbalance':
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] -
+                                      dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')])
+                        elif c == 'train_reduction_n_unbalance':
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')] -
+                                      dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')])
+                        elif c == 'all_reduction_n_unbalance_percent':
+                            delta = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')] - \
+                                    dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                            denom = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat')]
+                            per = delta / denom if denom != 0 else 0
+                            sr.append(per)
+                        elif c == 'test_reduction_n_unbalance_percent':
+                            delta = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')] - \
+                                    dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat_iptw')]
+                            denom = dftmp.iloc[0, dftmp.columns.get_loc('test_n_unbalanced_feat')]
+                            per = delta / denom if denom != 0 else 0
+                            sr.append(per)
+                        elif c == 'train_reduction_n_unbalance_percent':
+                            delta = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')] - \
+                                    dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
+                            denom = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat')]
+                            per = delta / denom if denom != 0 else 0
+                            sr.append(per)
+                        else:
+                            sr.append(dftmp.iloc[0, dftmp.columns.get_loc(c)])
+                        if (c in [col1, col2]) and (c != 'i'):
+                            sr_colname.append(c)
+                        else:
+                            sr_colname.append('{}-{}-{}'.format(col1, col2, c))
+                    selection_results.extend(sr)
+                    selection_results_colname.extend(sr_colname)
 
-        rdf = pd.DataFrame(results, columns=['fname', 'ctrl_type', 'fold-k-out'] + selection_results_colname)
+                results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type] + selection_results)
+
+                # # 1. selected by validation AUC
+                # dftmp = df.sort_values(by=['val_auc', 'i'], ascending=[False, True])
+                # val_auc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # val_auc_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_auc_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 2. selected by val_max_smd_iptw
+                # dftmp = df.sort_values(by=['val_max_smd_iptw', 'i'], ascending=[True, True])
+                # val_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_max_smd_iptw')]
+                # val_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 3. selected by val_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['val_n_unbalanced_feat_iptw', 'i'], ascending=[True, False])  # [True, True]
+                # val_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('val_n_unbalanced_feat_iptw')]
+                # val_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # val_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 4. selected by train_max_smd_iptw
+                # dftmp = df.sort_values(by=['train_max_smd_iptw', 'i'], ascending=[True, True])
+                # train_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_max_smd_iptw')]
+                # train_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # train_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 5. selected by train_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['train_n_unbalanced_feat_iptw', 'i'],
+                #                        ascending=[True, False])  # [True, True]
+                # train_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('train_n_unbalanced_feat_iptw')]
+                # train_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # train_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 6. selected by trainval_max_smd_iptw
+                # dftmp = df.sort_values(by=['trainval_max_smd_iptw', 'i'], ascending=[True, True])
+                # trainval_maxsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_max_smd_iptw')]
+                # trainval_maxsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_maxsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 7. selected by trainval_n_unbalanced_feat_iptw
+                # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'i'],
+                #                        ascending=[True, False])  # [True, True]
+                # trainval_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
+                # trainval_nsmd_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_nsmd_testauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # # 8. FINAL: selected by trainval_n_unbalanced_feat_iptw + val AUC
+                # dftmp = df.sort_values(by=['trainval_n_unbalanced_feat_iptw', 'val_auc'], ascending=[True, False])
+                # trainval_final_nsmd = dftmp.iloc[0, dftmp.columns.get_loc('trainval_n_unbalanced_feat_iptw')]
+                # trainval_final_valauc = dftmp.iloc[0, dftmp.columns.get_loc('val_auc')]
+                # trainval_final_finalnsmd = dftmp.iloc[0, dftmp.columns.get_loc('all_n_unbalanced_feat_iptw')]
+                # trainval_final_testnauc = dftmp.iloc[0, dftmp.columns.get_loc('test_auc')]
+                #
+                # results.append(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type,
+                #                 val_auc, val_auc_nsmd, val_auc_testauc,
+                #                 val_maxsmd, val_maxsmd_nsmd, val_maxsmd_testauc,
+                #                 val_nsmd, val_nsmd_nsmd, val_nsmd_testauc,
+                #                 train_maxsmd, train_maxsmd_nsmd, train_maxsmd_testauc,
+                #                 train_nsmd, train_nsmd_nsmd, train_nsmd_testauc,
+                #                 trainval_maxsmd, trainval_maxsmd_nsmd, trainval_maxsmd_testauc,
+                #                 trainval_nsmd, trainval_nsmd_nsmd, trainval_nsmd_testauc,
+                #                 trainval_final_nsmd, trainval_final_valauc, trainval_final_finalnsmd,
+                #                 trainval_final_testnauc,
+                #                 ])
+
+        rdf = pd.DataFrame(results, columns=['fname', 'ctrl_type'] + selection_results_colname)
         rdf.to_csv(dirname + 'results/' + drug + '_model_selection.csv')
 
         pre_col = []
@@ -569,7 +537,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
             boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug), '0-19', t, model), fontsize=25)
             # plt.xlabel("Model selection methods", fontsize=15)
             ax1.set_ylabel("#unbalanced_feat_iptw of boostrap experiments", fontsize=20)
-            # print(ax1.get_xticklabels())
+            print(ax1.get_xticklabels())
             ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, horizontalalignment='right')
             # fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}-allnsmd.png'.format(t))
             # plt.show()
@@ -604,7 +572,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise_nestcv/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -634,13 +602,9 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
             #      "trainval_nsmd_testauc", 'trainval_final_testnauc'])
             # for c1, c2 in zip(["val_auc_nsmd", "val_maxsmd_nsmd", "trainval_final_finalnsmd"],
             #                   ["val_auc_testauc", "val_maxsmd_testauc", 'trainval_final_testnauc']):
-            # for c1, c2 in zip(["val_auc-i-all_n_unbalanced_feat_iptw", "train_loss-i-all_n_unbalanced_feat_iptw",
-            #                    "trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw"],
-            #                   ["val_auc-i-test_auc", "train_loss-i-test_auc",
-            #                    "trainval_n_unbalanced_feat_iptw-val_auc-test_auc"]):
-            for c1, c2 in zip(["val_auc-i-all_n_unbalanced_feat_iptw", "val_loss-i-all_n_unbalanced_feat_iptw",
+            for c1, c2 in zip(["val_auc-i-all_n_unbalanced_feat_iptw", "train_loss-i-all_n_unbalanced_feat_iptw",
                                "trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw"],
-                              ["val_auc-i-test_auc", "val_loss-i-test_auc",
+                              ["val_auc-i-test_auc", "train_loss-i-test_auc",
                                "trainval_n_unbalanced_feat_iptw-val_auc-test_auc"]):
                 nsmd = rdf.loc[idx, c1]
                 auc = rdf.loc[idx, c2]
@@ -696,7 +660,7 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise_nestcv/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -777,36 +741,29 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
     print()
 
 
-def results_ATE_for_ml(exp_dir, cohort_dir_name, model, niter=50):
+def results_ATE_for_ml(cohort_dir_name, model, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)  # output/revise
-    print('dirname:', dirname)
+    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    for drug in tqdm(drug_list):
+    for drug in drug_list:
         results = []
         for ctrl_type in ['random', 'atc']:
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
                     df = pd.read_csv(fname + '_results.csv')
-                    r = df.loc[df.index[df['Unnamed: 0'] == 'all'].tolist()[0], :].copy()
+                    r = df.loc[df.index[df['Unnamed: 0'] == 'all'].tolist()[0], :]
                     for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original", "KM1-0_original_p",
                               "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW", "KM1-0_IPTW_p"]:
-                        if c in r.index:
-                            r.loc[c] = stringlist_2_list(r.loc[c])[-1]
-                    # rr = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                    #               index=['fname', 'ctrl_type']).append(r)
-                    rr = pd.concat([
-                        pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                                  index=['fname', 'ctrl_type']),
-                        r
-                    ])
-                    results.append(rr)
+                        r.loc[c] = stringlist_2_list(r.loc[c])[-1]
+                    r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
+                                  index=['fname', 'ctrl_type']).append(r)
+                    results.append(r)
 
                 except:
                     print('No file exisits: ', fname + '_results.csv')
@@ -817,20 +774,17 @@ def results_ATE_for_ml(exp_dir, cohort_dir_name, model, niter=50):
     print('Done')
 
 
-def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selected_balanced=True):
+def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
-    print('dirname:', dirname)
-
+    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}{}.xlsx'.format(
-        model, '' if selected_balanced else '-withunbalanced'), engine='xlsxwriter')
-    for t in ['all', 'random', 'atc']:
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), engine='xlsxwriter')
+    for t in ['random', 'atc', 'all']:
         results = []
         for drug in drug_list:
             rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
@@ -841,14 +795,11 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selecte
                 idx_all = (rdf['ctrl_type'].notna())
 
             # Only select balanced trial
-            if selected_balanced:
-                idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
-            else:
-                idx = idx_all
+            idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
 
             print('drug: ', drug, drug_name.get(drug, ''), t, 'support:', idx.sum())
-            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum(), idx.mean()]
-            col_name = ['drug', 'drug_name', 'niters', 'support', 'support-ratio']
+            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum()]
+            col_name = ['drug', 'drug_name', 'niters', 'support']
 
             for c in ["n_treat", "n_ctrl", "n_feature"]:  # , 'HR_IPTW', 'HR_IPTW_CI'
                 nv = rdf.loc[idx, c]
@@ -916,11 +867,8 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selecte
                 col_name.extend(["med-" + c, "iqr-" + c, "mean-" + c, "mean_ci-" + c, ])
 
             if len(nv) > 0:
-                if 'HR_ori' in rdf.columns:
-                    nv1 = rdf.loc[idx, 'HR_ori']
-                    p1, _ = bootstrap_mean_pvalue(nv1, expected_mean=1)
-                else:
-                    p1 = np.nan
+                nv1 = rdf.loc[idx, 'HR_ori']
+                p1, _ = bootstrap_mean_pvalue(nv1, expected_mean=1)
 
                 nv2 = rdf.loc[idx, 'HR_IPTW']
                 p2, _ = bootstrap_mean_pvalue(nv2, expected_mean=1)
@@ -938,7 +886,7 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selecte
             col_name.extend(['pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap',
                              'pvalue-KM1-0_original-boostrap', 'pvalue-KM1-0_IPTW-boostrap'])
 
-            if (len(nv) > 0) and ('HR_IPTW_p' in rdf.columns):
+            if len(nv) > 0:
                 nv = rdf.loc[idx, 'HR_IPTW_p']
                 _rid = nv[nv == nv.quantile(interpolation='nearest')].index[0]
                 HR_ori_CI = rdf.loc[_rid, 'HR_ori_CI']
@@ -950,9 +898,9 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selecte
             col_name.extend(["med-HR_ori_CI", "med-HR_IPTW_CI"])
 
             if 'HR_ori_CI' in rdf.columns:
-                r.append(';'.join([x if pd.notna(x) else '' for x in rdf.loc[idx, 'HR_ori_CI']]))
+                r.append(';'.join(rdf.loc[idx, 'HR_ori_CI']))
                 col_name.append('HR_ori_CI')
-            r.append(';'.join([x if pd.notna(x) else '' for x in rdf.loc[idx, 'HR_IPTW_CI']]))
+            r.append(';'.join(rdf.loc[idx, 'HR_IPTW_CI']))
             col_name.append('HR_IPTW_CI')
 
             results.append(r)
@@ -962,15 +910,10 @@ def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selecte
     print()
 
 
-def results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model, selected_balanced=True):
-    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
-    print('dirname:', dirname)
-
-    df_all = pd.read_excel(
-        dirname + 'results/summarized_IPTW_ATE_{}{}.xlsx'.format(model, '' if selected_balanced else '-withunbalanced'),
-        sheet_name=None)
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo{}.xlsx'.format(model,
-                                                                                               '' if selected_balanced else '-withunbalanced'),
+def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
+    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
+    df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), sheet_name=None)
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model),
                             engine='xlsxwriter')
     for sheet in ['all', 'random', 'atc']:
         df = df_all[sheet]
@@ -980,28 +923,24 @@ def results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model, selected
         # idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
         # idx = (df['support'] >= 10) & (df['med-HR_IPTW_p'] <= 0.05)
         # idx = (df['support'] >= 10) & (df['pvalue-HR_IPTW-boostrap'] <= 0.05)
-        # idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW-boostrap'] <= 0.05)
-        idx = (df['support'] >= 10)
+        idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW-boostrap'] <= 0.05)
 
         # df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
         df_sort = df.loc[idx, :].sort_values(by=['mean-HR_IPTW'], ascending=[True])
 
-        cols = ['drug', 'drug_name', 'niters', 'support', 'n_treat', 'n_ctrl', 'n_feature',
-                'mean-n_unbalanced_feature', 'mean_ci-n_unbalanced_feature',
-                'mean-n_unbalanced_feature_IPTW', 'mean_ci-n_unbalanced_feature_IPTW',
-                # 'mean-ATE_original', 'mean_ci-ATE_original', 'pvalue-ATE_original',
-                # 'mean-ATE_IPTW', 'mean_ci-ATE_IPTW', 'pvalue-ATE_IPTW',
-                # 'mean-KM1-0_original', 'mean_ci-KM1-0_original', 'pvalue-KM1-0_original',
-                'mean-KM1-0_IPTW', 'mean_ci-KM1-0_IPTW', 'mean-KM1-0_IPTW_p',  # 'pvalue-KM1-0_IPTW',
-                'mean-HR_IPTW', 'med-HR_IPTW', 'mean_ci-HR_IPTW', 'mean-HR_IPTW_p', 'med-HR_IPTW_p',  # 'pvalue-HR_IPTW'
-                "med-HR_ori_CI", "med-HR_IPTW_CI",
-                'pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap', 'pvalue-KM1-0_original-boostrap',
-                'pvalue-KM1-0_IPTW-boostrap'
-                ]
-        df_final = df_sort[[x for x in cols if x in df_sort.columns]].copy()
-        for c in [x for x in cols if x not in df_sort.columns]:
-            print('no column:', c)
-            df_final[c] = np.nan
+        df_final = df_sort[
+            ['drug', 'drug_name', 'niters', 'support', 'n_treat', 'n_ctrl', 'n_feature',
+             'mean-n_unbalanced_feature', 'mean_ci-n_unbalanced_feature',
+             'mean-n_unbalanced_feature_IPTW', 'mean_ci-n_unbalanced_feature_IPTW',
+             # 'mean-ATE_original', 'mean_ci-ATE_original', 'pvalue-ATE_original',
+             # 'mean-ATE_IPTW', 'mean_ci-ATE_IPTW', 'pvalue-ATE_IPTW',
+             # 'mean-KM1-0_original', 'mean_ci-KM1-0_original', 'pvalue-KM1-0_original',
+             'mean-KM1-0_IPTW', 'mean_ci-KM1-0_IPTW', 'mean-KM1-0_IPTW_p',  # 'pvalue-KM1-0_IPTW',
+             'mean-HR_IPTW', 'med-HR_IPTW', 'mean_ci-HR_IPTW', 'mean-HR_IPTW_p', 'med-HR_IPTW_p',  # 'pvalue-HR_IPTW'
+             "med-HR_ori_CI", "med-HR_IPTW_CI",
+             'pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap', 'pvalue-KM1-0_original-boostrap',
+             'pvalue-KM1-0_IPTW-boostrap'
+             ]]
 
         df_final['n_ctrl'] = df_final['n_ctrl'].apply(
             lambda x: '{:.1f}'.format(x))
@@ -1039,7 +978,7 @@ def results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model, selected
 
 
 def combine_ate_final_LR_with(cohort_dir_name, model):
-    dirname = r'output/revise/{}/LR/'.format(cohort_dir_name)
+    dirname = r'output/{}/LR/'.format(cohort_dir_name)
     df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo-allPvalue.xlsx'.format('LR'),
                           sheet_name=None,
                           dtype=str)
@@ -1112,170 +1051,6 @@ def combine_ate_final_LR_with(cohort_dir_name, model):
     print('Done results_ATE_for_ml_step3_finalInfo')
 
 
-def _combine_balanced_and_all(fname1, fname2, sheet):
-    print('fname1:', fname1)
-    print('fname2:', fname2)
-    print('sheet:', sheet)
-
-    df1 = pd.read_excel(fname1, sheet_name=sheet, dtype={'drug': str})  # dtype=str
-    df2 = pd.read_excel(fname2, sheet_name=sheet, dtype={'drug': str})  # dtype=str
-
-    df1_part = df1[['drug', 'drug_name', 'niters', 'support', 'n_treat',
-                    'n_ctrl', 'n_feature', 'mean-n_unbalanced_feature',
-                    'mean_ci-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW',
-                    'mean_ci-n_unbalanced_feature_IPTW']]
-
-    df2_part = df2[['drug', 'drug_name', 'niters', 'support', 'n_treat',
-                    'n_ctrl', 'n_feature', 'mean-n_unbalanced_feature',
-                    'mean_ci-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW',
-                    'mean_ci-n_unbalanced_feature_IPTW']]
-
-    df = df1_part.join(df2_part.set_index('drug'), lsuffix='_withunbalanced', rsuffix='', on='drug', how='left')
-
-    return df
-
-
-def _get_no_unbalanced_iptw(dirname, drug, ctrl_type):
-    # 'output/revise_testset/save_cohort_all_loose/LR/results/'
-    rdf = pd.read_excel(dirname + drug + '_results.xlsx')
-    if ctrl_type in ('random', 'atc'):
-        idx_all = (rdf['ctrl_type'] == ctrl_type)
-    elif ctrl_type == 'all':
-        idx_all = (rdf['ctrl_type'].notna())
-    else:
-        raise ValueError
-
-    # Only select balanced trial
-    idx_balanced = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
-    idx = idx_all
-
-    vn_balanced = rdf.loc[idx_balanced, "n_unbalanced_feature_IPTW"]
-    vn_all = rdf.loc[idx, "n_unbalanced_feature_IPTW"]
-
-    print(dirname, drug, 'len(vn_all)', len(vn_all), 'len(vn_balanced)', len(vn_balanced), )
-    return vn_all, vn_balanced
-
-
-def combine_balance_performance_LR_deep(sheet='all', drug_list=None):
-    dirname = r'output/revise_testset/save_cohort_all_loose/LR/'
-
-    df_lr = _combine_balanced_and_all(
-        'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo-withunbalanced.xlsx',
-        'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo.xlsx',
-        sheet)
-    df_lr['Model'] = 'LR'
-    df_lr = df_lr.sort_values(by=['support'], ascending=[False])
-
-    df_gbm = _combine_balanced_and_all(
-        'output/save_cohort_all_loose/LIGHTGBM/results/summarized_IPTW_ATE_LIGHTGBM_finalInfo-withunbalanced.xlsx',
-        'output/save_cohort_all_loose/LIGHTGBM/results/summarized_IPTW_ATE_LIGHTGBM_finalInfo.xlsx',
-        sheet)
-    df_gbm['Model'] = 'GBM'
-
-    df_mlp = _combine_balanced_and_all(
-        'output/save_cohort_all_loose/MLP/results/summarized_IPTW_ATE_MLP_finalInfo-withunbalanced.xlsx',
-        'output/save_cohort_all_loose/MLP/results/summarized_IPTW_ATE_MLP_finalInfo.xlsx',
-        sheet)
-    df_mlp['Model'] = 'MLP'
-
-    df_lstm = _combine_balanced_and_all(
-        'output/save_cohort_all_loose/LSTM/results/summarized_IPTW_ATE_LSTM_finalInfo-withunbalanced.xlsx',
-        'output/save_cohort_all_loose/LSTM/results/summarized_IPTW_ATE_LSTM_finalInfo.xlsx',
-        sheet)
-    df_lstm['Model'] = 'LSTM'
-
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_cat_GBM-MLP-LSTM.xlsx',
-                            engine='xlsxwriter')
-
-    # col_name = ['drug', 'Drug', 'Model', 'niters', 'Support', 'Treat', 'Ctrl',
-    #             'n_feature', ' Unbalanced', 'Unbalanced IPTW', 'KM', 'HR']
-
-    # def significance(val):
-    #     if val < 0.001:
-    #         return '***'
-    #     elif val < 0.01:
-    #         return '**'
-    #     elif val < 0.05:
-    #         return '*'
-    #     else:
-    #         return 'ns'
-    #
-    # def return_select_content(key, row, null_model=''):
-    #     data = [key, ]
-    #     col1 = ['drug_name', 'Model', 'niters', 'support', 'n_treat', 'n_ctrl',
-    #             'n_feature', 'mean-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW']
-    #     if null_model:
-    #         for c in col1:
-    #             data.append(row[c])
-    #         data[2] = null_model.upper()
-    #         data[4] = 0
-    #         data[5] = data[6] = data[7] = data[8] = data[9] = np.nan
-    #         data.append(np.nan)
-    #         data.append(np.nan)
-    #     else:
-    #         for c in col1:
-    #             data.append(row[c])
-    #         data.append(row['mean-KM1-0_IPTW'] + ' (' + row['mean_ci-KM1-0_IPTW'] + ')' + '$^{' + significance(
-    #             float(row['pvalue-KM1-0_IPTW'])) + '}$')
-    #         data.append(row['mean-HR_IPTW'] + ' (' + row['mean_ci-HR_IPTW'] + ')' + '$^{' + significance(
-    #             float(row['pvalue-HR_IPTW'])) + '}$')
-    #     return data
-
-    dflr = df_lr.set_index('drug')
-    dfgbm = df_gbm.set_index('drug')
-    dfmlp = df_mlp.set_index('drug')
-    dflstm = df_lstm.set_index('drug')
-
-    data = []
-    for key, row in dflr.iterrows():
-        if drug_list is not None:
-            if key not in drug_list:
-                continue
-        ## add test here, compared unbalanced feature after iptw, p-value
-        vn_all_lr, vn_balanced_lr = _get_no_unbalanced_iptw('output/revise_testset/save_cohort_all_loose/LR/results/',
-                                                            key, sheet)
-        vn_all_gbm, vn_balanced_gbm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LIGHTGBM/results/', key,
-                                                              sheet)
-        vn_all_mlp, vn_balanced_mlp = _get_no_unbalanced_iptw('output/save_cohort_all_loose/MLP/results/', key, sheet)
-        vn_all_lstm, vn_balanced_lstm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LSTM/results/', key,
-                                                                sheet)
-
-        pgbm, test_origgbm = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_gbm)
-        pgbm_balanced, test_origgbm_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_gbm)
-
-        pmlp, test_origmlp = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_mlp)
-        pmlp_balanced, test_origmlp_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_mlp)
-
-        plstm, test_origlstm = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_lstm)
-        plstm_balanced, test_origlstm_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_lstm)
-
-        row = row.copy()
-        row['p_2sample'] = np.nan
-        row['p_2sample_balanced'] = np.nan
-
-        row2 = dfgbm.loc[key, :].copy()
-        row2['p_2sample'] = test_origgbm.pvalue
-        row2['p_2sample_balanced'] = test_origgbm_balanced.pvalue
-
-        row3 = dfmlp.loc[key, :].copy()
-        row3['p_2sample'] = test_origmlp.pvalue
-        row3['p_2sample_balanced'] = test_origmlp_balanced.pvalue
-
-        row4 = dflstm.loc[key, :].copy()
-        row4['p_2sample'] = test_origlstm.pvalue
-        row4['p_2sample_balanced'] = test_origlstm_balanced.pvalue
-        ####
-        data.append(row)
-        data.append(row2)
-        data.append(row3)
-        data.append(row4)
-
-    df_final = pd.DataFrame(data=data)  # , columns=col_name
-    df_final.to_excel(writer, sheet_name=sheet)
-    writer.save()
-    print('Done results_ATE_for_ml_step3_finalInfo')
-
-
 def check_drug_name_code():
     df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
     rx_df = pd.read_csv(r'../ipreprocess/output/save_cohort_all_loose/cohort_all_name_size_positive_loose.csv',
@@ -1326,11 +1101,11 @@ def check_drug_name_code():
 
 
 def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/revise_nestcv/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
 
     c1 = 'success_rate-val_auc-i-all_n_unbalanced_feat_iptw'
-    c2 = 'success_rate-val_loss-i-all_n_unbalanced_feat_iptw'  # 'success_rate-train_loss-i-all_n_unbalanced_feat_iptw'
+    c2 = 'success_rate-train_loss-i-all_n_unbalanced_feat_iptw'
     c3 = 'success_rate-trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw'
 
     idx_auc = dfall[c1] >= 0.1
@@ -1464,7 +1239,7 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
         ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
 
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
-    ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Val-Loss Select', 'Our Strategy'),
+    ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Train-Loss Select', 'Our Strategy'),
               fontsize=25)  # , bbox_to_anchor=(1.13, 1.01))
 
     # ax.autoscale(enable=True, axis='x', tight=True)
@@ -1768,11 +1543,11 @@ def bar_plot_model_selectionV2_test(cohort_dir_name, model, contrl_type='random'
 def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contrl_type='random', dump=True,
                                                    colorful=True, datapart='all', log=False):
     # dataset: train, test, all
-    dirname = r'output/revise_nestcv/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
-    c2 = 'val_loss-i' #'train_loss-i'
+    c2 = 'train_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
     c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  # val_loss
 
@@ -2573,188 +2348,66 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
 
 
 if __name__ == '__main__':
+
     with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
-    # 2023-6-22 Revise 2---Step 1, nest CV, generate shell
-    # use nest CV, use 5yrs follow-up
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False)
-    # split_shell_file("revise_nestcv_shell_LR_save_cohort_all_loose_f5yrs.sh", divide=3, skip_first=1)
-    # shell_for_ml(cohort_dir_name='save_cohort_all_loose_f5yrs', model='LIGHTGBM', niter=50, stats=False)
-    # split_shell_file("revise_nestcv_shell_LIGHTGBM_save_cohort_all_loose_f5yrs.sh", divide=3, skip_first=1)
-    #
-    # 2023-6-27 Revise 2---Step 2, aggregate model selection results
-    # change folder, what changes should be made for NestCV? there are outer and inner CV?
-    # change from 'save_cohort_all_loose', balance results should be same, only difference is ate part
-    cohort_dir_name = 'save_cohort_all_loose_f5yrs'
-    model = 'LR'  # 'MLP'   #'LIGHTGBM'   #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    cohort_dir_name = 'save_cohort_all_loose'
+    model = 'LIGHTGBM'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+
+
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
-    # 2023-6-27 Revise 2---Step 3, aggregate ate results
+    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
+    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
 
-    # plot bar plot, for balance:
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    #
+    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
+    #
+    # major plots from 3 methods
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
-    # ploar arrow plot for balance
+    # zz
+    # sys.exit(0)
+
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
+    #                                                datapart='all')
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
+    #                                                datapart='train')
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
+    #                                                datapart='test')
+    #
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
+    #                                                datapart='all')
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
+    #                                                datapart='train')
+    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
+    #                                                datapart='test')
+
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='all')
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='train')
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='test')
-    zz
-    # 2023-1-09 collider exp
-    # shell_for_ml_selectcov(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
-    # split_shell_file("revise_selectcov_shell_LR_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    # sys.exit(0)
-    #
-    # df_drug = pd.read_excel(
-    #     r'output/save_cohort_all_loose/LR/results_major/summarized_IPTW_ATE_LR_finalInfo-allPvalue.xlsx',
-    #     'all', dtype={'drug':str})
-    # drug_list = df_drug['drug'].to_list() + ['6809', '135447'] # metformin, donepezil
-    #
-    # # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LSTM', niter=50, stats=False)
-    # # split_shell_file("revise_shell_LSTM_save_cohort_all_loose.sh", divide=4, skip_first=1)
-    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LIGHTGBM', niter=50, stats=False)
-    # split_shell_file("revise_testset_shell_LIGHTGBM_save_cohort_all_loose.sh", divide=3, skip_first=1)
-    # # return 1
 
-    # 2022-12-29
-    # shell_for_ml_simulation('LR', niter=100, start=50, more_para='') #
-    # split_shell_file("simulate_shell_LR-server2-part2.sh", divide=4, skip_first=1)
-
-    # shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
-    # split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=5, skip_first=1)
-
+    sys.exit(0)
     #
-    # # shell_for_ml_simulation('LIGHTGBM', niter=10, more_para='')
-    # sys.exit(0)
-    #
-    # df_drug = pd.read_csv(
-    #     r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
-    #     dtype={'drug': str})
-    # drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
-    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
-    #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    sys.exit(0)
 
-    # 2023-1-11
-    # drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
-    # shell_for_ml_selected_drugs_5yrs(
-    #     drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,
-    #     stats=False)
-    # split_shell_file('revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_selected.sh', divide=3, skip_first=1)
-    #
-    #
-    # sys.exit(0)
-
-    ## primary and sensitivity analysis
-    # cohort_dir_name = 'save_cohort_all_loose'
-    # model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    #
-    # # exp_dir = r'output/revise'   # main results
-    # exp_dir = r'output/revise_selectcov'  # sensitivity analysis
-    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
-    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')
-
-    # 2023-1-12, 5 yrs followup sensitivity
-    # cohort_dir_name = 'save_cohort_all_loose_f5yrs'
-    # model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # exp_dir = r'output/revise_f5yrs'  # sensitivity analysis
-    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
-    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')
-    #
-    # zz
-    # 2023-1-10 generating table 1, balance performance across ML models
-    # exp_dir = r'output/revise_testset'
-    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', niter=50)
-    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR')
-    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model='LR', drug_name=drug_name, selected_balanced=False)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model='LR', selected_balanced=False)
-    # # # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
-    #
-
-    # results_ATE_for_ml(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='MLP', niter=50)
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='MLP', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='MLP')
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='MLP', drug_name=drug_name, selected_balanced=False)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='MLP', selected_balanced=False)
-
-    # results_ATE_for_ml(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LSTM', niter=50)
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LSTM', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LSTM')
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LSTM', drug_name=drug_name,
-    #                          selected_balanced=False)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LSTM',
-    #                                    selected_balanced=False)
-
-    # results_ATE_for_ml(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM', niter=50)
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM', drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM')
-    # results_ATE_for_ml_step2(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM', drug_name=drug_name,
-    #                          selected_balanced=False)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir=r'output', cohort_dir_name=cohort_dir_name, model='LIGHTGBM',
-    #                                    selected_balanced=False)
-
-    #
-    # df_lr = pd.read_excel(
-    #     'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo.xlsx',
-    #     sheet_name='all', dtype={'drug': str})
-    # drug_list = df_lr['drug'].to_list()
-    # combine_balance_performance_LR_deep(sheet='all', drug_list=drug_list)
-    # zz
-    # #
-    # #
-    # # major plots from 3 methods
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # sys.exit(0)
-
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='test')
-    #
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='test')
-
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-    #                                                datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-    #                                                datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-    #                                                datapart='test')
-    #
-    # sys.exit(0)
-
-    #
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # sys.exit(0)
-    #
-    # # # # ## all methods plots in appendix
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
+    # # # ## all methods plots in appendix
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
     # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
