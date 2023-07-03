@@ -46,6 +46,9 @@ def stringlist_2_list(s):
 
 
 def stringlist_2_str(s, percent=False, digit=-1):
+    if pd.isna(s):
+        # print()
+        return s
     r = s.strip('][').replace(',', ' ').split()
     r = list(map(float, r))
     if percent:
@@ -144,7 +147,9 @@ def bootstrap_mean_pvalue_2samples(x, y, equal_var=False, B=1000):
 
 
 def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
-    fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
+    # fo = open('simulate_shell_{}-server2-part2.sh'.format(model), 'w')  # 'a'
+    fo = open('simulate_shell_{}-server2.sh'.format(model), 'w')  # 'a'
+
     fo.write('mkdir -p output/simulate/{}/log\n'.format(model))
     r = 0
     for n in [3000, 3500, 4000, 4500, 5000]:  # [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
@@ -207,6 +212,50 @@ def shell_for_ml(cohort_dir_name, model, niter=50, min_patients=500, stats=True,
     print('In total ', n, ' commands')
 
 
+def shell_for_ml_selectcov(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    fo = open('revise_selectcov_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+            added_drug.extend(gpi)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo.write('mkdir -p output/revise_selectcov/{}/{}/log\n'.format(cohort_dir_name, model))
+    n = 0
+    for x in name_cnt:
+        k, v = x
+        if (v >= min_patients) or (k in added_drug):
+            drug = k.split('.')[0]
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main_revise_selectcov.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/revise_selectcov/{}/{}/ --random_seed {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output/revise_selectcov/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n += 1
+
+    fo.close()
+    print('In total ', n, ' commands')
+
+
 def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min_patients=500, stats=True,
                                 more_para='', folder='revise_testset'):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
@@ -233,6 +282,45 @@ def shell_for_ml_selected_drugs(drug_list, cohort_dir_name, model, niter=50, min
             for ctrl_type in ['random', 'atc']:
                 for seed in range(0, niter):
                     cmd = "python main_revise_testset.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/{}/{}/{}/ --random_seed {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output/{}/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, folder, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        folder, cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n += 1
+
+    fo.close()
+    print('In total ', n, ' commands')
+
+
+def shell_for_ml_selected_drugs_5yrs(drug_list, cohort_dir_name, model, niter=50, min_patients=500, stats=True,
+                                     more_para='', folder='revise_f5yrs'):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    fo = open('revise_f5yrs_shell_{}_{}_selected.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    # df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = []
+    for rx in drug_list:
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo.write('mkdir -p output/{}/{}/{}/log\n'.format(folder, cohort_dir_name, model))
+    n = 0
+    for x in name_cnt:
+        k, v = x
+        if k in added_drug:
+            drug = k.split('.')[0]
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
                           "--controlled_drug {} --run_model {} --output_dir output/{}/{}/{}/ --random_seed {} " \
                           "--drug_coding rxnorm --med_code_topk 200 {} {} " \
                           "2>&1 | tee output/{}/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
@@ -370,21 +458,21 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    for drug in drug_list:
+    for drug in tqdm(drug_list, total=len(drug_list)):
         results = []
         for ctrl_type in ['random', 'atc']:
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
-                    df = pd.read_csv(fname + '_ALL-model-select.csv')
+                    df = pd.read_csv(fname + '_ALL-model-select-agg.csv')
                     df.rename(columns=_simplify_col_, inplace=True)
                 except:
-                    print('No file exisits: ', fname + '_ALL-model-select.csv')
+                    print('No file exisits: ', fname + '_ALL-model-select-agg.csv')
                     continue
 
                 selection_configs = [
@@ -474,7 +562,7 @@ def results_model_selection_for_ml(cohort_dir_name, model, drug_name, niter=50):
             boxplot.set_title("{}-{}_S{}D200C{}_{}".format(drug, drug_name.get(drug), '0-19', t, model), fontsize=25)
             # plt.xlabel("Model selection methods", fontsize=15)
             ax1.set_ylabel("#unbalanced_feat_iptw of boostrap experiments", fontsize=20)
-            # print(ax1.get_xticklabels())
+            print(ax1.get_xticklabels())
             ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, horizontalalignment='right')
             # fig.savefig(dirname + 'results/' + drug + '_model_selection_boxplot-{}-allnsmd.png'.format(t))
             # plt.show()
@@ -509,7 +597,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -579,7 +667,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
                          dtype=np.float64)
             y1 = np.array(rdf.loc[idx, "val_auc-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
-            y2 = np.array(rdf.loc[idx, "val_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
+            y2 = np.array(rdf.loc[idx, "train_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
             p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
             p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
@@ -601,7 +689,7 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
@@ -682,29 +770,36 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
     print()
 
 
-def results_ATE_for_ml(cohort_dir_name, model, niter=50):
+def results_ATE_for_ml(exp_dir, cohort_dir_name, model, niter=50):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)  # output/revise
+    print('dirname:', dirname)
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    for drug in drug_list:
+    for drug in tqdm(drug_list):
         results = []
         for ctrl_type in ['random', 'atc']:
             for seed in range(0, niter):
                 fname = dirname + drug + "/{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model)
                 try:
                     df = pd.read_csv(fname + '_results.csv')
-                    r = df.loc[df.index[df['Unnamed: 0'] == 'all'].tolist()[0], :]
+                    r = df.loc[df.index[df['Unnamed: 0'] == 'all'].tolist()[0], :].copy()
                     for c in ["KM_time_points", "KM1_original", "KM0_original", "KM1-0_original", "KM1-0_original_p",
                               "KM1_IPTW", "KM0_IPTW", "KM1-0_IPTW", "KM1-0_IPTW_p"]:
-                        r.loc[c] = stringlist_2_list(r.loc[c])[-1]
-                    r = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
-                                  index=['fname', 'ctrl_type']).append(r)
-                    results.append(r)
+                        if c in r.index:
+                            r.loc[c] = stringlist_2_list(r.loc[c])[-1]
+                    # rr = pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
+                    #               index=['fname', 'ctrl_type']).append(r)
+                    rr = pd.concat([
+                        pd.Series(["{}_S{}D200C{}_{}".format(drug, seed, ctrl_type, model), ctrl_type],
+                                  index=['fname', 'ctrl_type']),
+                        r
+                    ])
+                    results.append(rr)
 
                 except:
                     print('No file exisits: ', fname + '_results.csv')
@@ -715,17 +810,20 @@ def results_ATE_for_ml(cohort_dir_name, model, niter=50):
     print('Done')
 
 
-def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
+def results_ATE_for_ml_step2(exp_dir, cohort_dir_name, model, drug_name, selected_balanced=True):
     cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
     name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
     drug_list_all = [drug.split('.')[0] for drug, cnt in name_cnt]
-    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
+    print('dirname:', dirname)
+
     drug_in_dir = set([x for x in os.listdir(dirname) if x.isdigit()])
     drug_list = [x for x in drug_list_all if x in drug_in_dir]  # in order
     check_and_mkdir(dirname + 'results/')
 
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), engine='xlsxwriter')
-    for t in ['random', 'atc', 'all']:
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}{}.xlsx'.format(
+        model, '' if selected_balanced else '-withunbalanced'), engine='xlsxwriter')
+    for t in ['all', 'random', 'atc']:
         results = []
         for drug in drug_list:
             rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
@@ -736,11 +834,14 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
                 idx_all = (rdf['ctrl_type'].notna())
 
             # Only select balanced trial
-            idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
+            if selected_balanced:
+                idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
+            else:
+                idx = idx_all
 
             print('drug: ', drug, drug_name.get(drug, ''), t, 'support:', idx.sum())
-            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum()]
-            col_name = ['drug', 'drug_name', 'niters', 'support']
+            r = [drug, drug_name.get(drug, ''), idx_all.sum(), idx.sum(), idx.mean()]
+            col_name = ['drug', 'drug_name', 'niters', 'support', 'support-ratio']
 
             for c in ["n_treat", "n_ctrl", "n_feature"]:  # , 'HR_IPTW', 'HR_IPTW_CI'
                 nv = rdf.loc[idx, c]
@@ -808,8 +909,11 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
                 col_name.extend(["med-" + c, "iqr-" + c, "mean-" + c, "mean_ci-" + c, ])
 
             if len(nv) > 0:
-                nv1 = rdf.loc[idx, 'HR_ori']
-                p1, _ = bootstrap_mean_pvalue(nv1, expected_mean=1)
+                if 'HR_ori' in rdf.columns:
+                    nv1 = rdf.loc[idx, 'HR_ori']
+                    p1, _ = bootstrap_mean_pvalue(nv1, expected_mean=1)
+                else:
+                    p1 = np.nan
 
                 nv2 = rdf.loc[idx, 'HR_IPTW']
                 p2, _ = bootstrap_mean_pvalue(nv2, expected_mean=1)
@@ -827,7 +931,7 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
             col_name.extend(['pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap',
                              'pvalue-KM1-0_original-boostrap', 'pvalue-KM1-0_IPTW-boostrap'])
 
-            if len(nv) > 0:
+            if (len(nv) > 0) and ('HR_IPTW_p' in rdf.columns):
                 nv = rdf.loc[idx, 'HR_IPTW_p']
                 _rid = nv[nv == nv.quantile(interpolation='nearest')].index[0]
                 HR_ori_CI = rdf.loc[_rid, 'HR_ori_CI']
@@ -839,9 +943,9 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
             col_name.extend(["med-HR_ori_CI", "med-HR_IPTW_CI"])
 
             if 'HR_ori_CI' in rdf.columns:
-                r.append(';'.join(rdf.loc[idx, 'HR_ori_CI']))
+                r.append(';'.join([x if pd.notna(x) else '' for x in rdf.loc[idx, 'HR_ori_CI']]))
                 col_name.append('HR_ori_CI')
-            r.append(';'.join(rdf.loc[idx, 'HR_IPTW_CI']))
+            r.append(';'.join([x if pd.notna(x) else '' for x in rdf.loc[idx, 'HR_IPTW_CI']]))
             col_name.append('HR_IPTW_CI')
 
             results.append(r)
@@ -851,10 +955,15 @@ def results_ATE_for_ml_step2(cohort_dir_name, model, drug_name):
     print()
 
 
-def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
-    dirname = r'output/revise/{}/{}/'.format(cohort_dir_name, model)
-    df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model), sheet_name=None)
-    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo.xlsx'.format(model),
+def results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model, selected_balanced=True):
+    dirname = r'{}/{}/{}/'.format(exp_dir, cohort_dir_name, model)
+    print('dirname:', dirname)
+
+    df_all = pd.read_excel(
+        dirname + 'results/summarized_IPTW_ATE_{}{}.xlsx'.format(model, '' if selected_balanced else '-withunbalanced'),
+        sheet_name=None)
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo{}.xlsx'.format(model,
+                                                                                               '' if selected_balanced else '-withunbalanced'),
                             engine='xlsxwriter')
     for sheet in ['all', 'random', 'atc']:
         df = df_all[sheet]
@@ -864,24 +973,28 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
         # idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
         # idx = (df['support'] >= 10) & (df['med-HR_IPTW_p'] <= 0.05)
         # idx = (df['support'] >= 10) & (df['pvalue-HR_IPTW-boostrap'] <= 0.05)
-        idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW-boostrap'] <= 0.05)
+        # idx = (df['support'] >= 10) & (df['pvalue-KM1-0_IPTW-boostrap'] <= 0.05)
+        idx = (df['support'] >= 10)
 
         # df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
         df_sort = df.loc[idx, :].sort_values(by=['mean-HR_IPTW'], ascending=[True])
 
-        df_final = df_sort[
-            ['drug', 'drug_name', 'niters', 'support', 'n_treat', 'n_ctrl', 'n_feature',
-             'mean-n_unbalanced_feature', 'mean_ci-n_unbalanced_feature',
-             'mean-n_unbalanced_feature_IPTW', 'mean_ci-n_unbalanced_feature_IPTW',
-             # 'mean-ATE_original', 'mean_ci-ATE_original', 'pvalue-ATE_original',
-             # 'mean-ATE_IPTW', 'mean_ci-ATE_IPTW', 'pvalue-ATE_IPTW',
-             # 'mean-KM1-0_original', 'mean_ci-KM1-0_original', 'pvalue-KM1-0_original',
-             'mean-KM1-0_IPTW', 'mean_ci-KM1-0_IPTW', 'mean-KM1-0_IPTW_p',  # 'pvalue-KM1-0_IPTW',
-             'mean-HR_IPTW', 'med-HR_IPTW', 'mean_ci-HR_IPTW', 'mean-HR_IPTW_p', 'med-HR_IPTW_p',  # 'pvalue-HR_IPTW'
-             "med-HR_ori_CI", "med-HR_IPTW_CI",
-             'pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap', 'pvalue-KM1-0_original-boostrap',
-             'pvalue-KM1-0_IPTW-boostrap'
-             ]]
+        cols = ['drug', 'drug_name', 'niters', 'support', 'n_treat', 'n_ctrl', 'n_feature',
+                'mean-n_unbalanced_feature', 'mean_ci-n_unbalanced_feature',
+                'mean-n_unbalanced_feature_IPTW', 'mean_ci-n_unbalanced_feature_IPTW',
+                # 'mean-ATE_original', 'mean_ci-ATE_original', 'pvalue-ATE_original',
+                # 'mean-ATE_IPTW', 'mean_ci-ATE_IPTW', 'pvalue-ATE_IPTW',
+                # 'mean-KM1-0_original', 'mean_ci-KM1-0_original', 'pvalue-KM1-0_original',
+                'mean-KM1-0_IPTW', 'mean_ci-KM1-0_IPTW', 'mean-KM1-0_IPTW_p',  # 'pvalue-KM1-0_IPTW',
+                'mean-HR_IPTW', 'med-HR_IPTW', 'mean_ci-HR_IPTW', 'mean-HR_IPTW_p', 'med-HR_IPTW_p',  # 'pvalue-HR_IPTW'
+                "med-HR_ori_CI", "med-HR_IPTW_CI",
+                'pvalue-HR_ori-boostrap', 'pvalue-HR_IPTW-boostrap', 'pvalue-KM1-0_original-boostrap',
+                'pvalue-KM1-0_IPTW-boostrap'
+                ]
+        df_final = df_sort[[x for x in cols if x in df_sort.columns]].copy()
+        for c in [x for x in cols if x not in df_sort.columns]:
+            print('no column:', c)
+            df_final[c] = np.nan
 
         df_final['n_ctrl'] = df_final['n_ctrl'].apply(
             lambda x: '{:.1f}'.format(x))
@@ -919,7 +1032,7 @@ def results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model):
 
 
 def combine_ate_final_LR_with(cohort_dir_name, model):
-    dirname = r'output/{}/LR/'.format(cohort_dir_name)
+    dirname = r'output/revise/{}/LR/'.format(cohort_dir_name)
     df_lr = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}_finalInfo-allPvalue.xlsx'.format('LR'),
                           sheet_name=None,
                           dtype=str)
@@ -992,6 +1105,170 @@ def combine_ate_final_LR_with(cohort_dir_name, model):
     print('Done results_ATE_for_ml_step3_finalInfo')
 
 
+def _combine_balanced_and_all(fname1, fname2, sheet):
+    print('fname1:', fname1)
+    print('fname2:', fname2)
+    print('sheet:', sheet)
+
+    df1 = pd.read_excel(fname1, sheet_name=sheet, dtype={'drug': str})  # dtype=str
+    df2 = pd.read_excel(fname2, sheet_name=sheet, dtype={'drug': str})  # dtype=str
+
+    df1_part = df1[['drug', 'drug_name', 'niters', 'support', 'n_treat',
+                    'n_ctrl', 'n_feature', 'mean-n_unbalanced_feature',
+                    'mean_ci-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW',
+                    'mean_ci-n_unbalanced_feature_IPTW']]
+
+    df2_part = df2[['drug', 'drug_name', 'niters', 'support', 'n_treat',
+                    'n_ctrl', 'n_feature', 'mean-n_unbalanced_feature',
+                    'mean_ci-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW',
+                    'mean_ci-n_unbalanced_feature_IPTW']]
+
+    df = df1_part.join(df2_part.set_index('drug'), lsuffix='_withunbalanced', rsuffix='', on='drug', how='left')
+
+    return df
+
+
+def _get_no_unbalanced_iptw(dirname, drug, ctrl_type):
+    # 'output/revise_testset/save_cohort_all_loose/LR/results/'
+    rdf = pd.read_excel(dirname + drug + '_results.xlsx')
+    if ctrl_type in ('random', 'atc'):
+        idx_all = (rdf['ctrl_type'] == ctrl_type)
+    elif ctrl_type == 'all':
+        idx_all = (rdf['ctrl_type'].notna())
+    else:
+        raise ValueError
+
+    # Only select balanced trial
+    idx_balanced = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
+    idx = idx_all
+
+    vn_balanced = rdf.loc[idx_balanced, "n_unbalanced_feature_IPTW"]
+    vn_all = rdf.loc[idx, "n_unbalanced_feature_IPTW"]
+
+    print(dirname, drug, 'len(vn_all)', len(vn_all), 'len(vn_balanced)', len(vn_balanced), )
+    return vn_all, vn_balanced
+
+
+def combine_balance_performance_LR_deep(sheet='all', drug_list=None):
+    dirname = r'output/revise_testset/save_cohort_all_loose/LR/'
+
+    df_lr = _combine_balanced_and_all(
+        'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo-withunbalanced.xlsx',
+        'output/revise_testset/save_cohort_all_loose/LR/results/summarized_IPTW_ATE_LR_finalInfo.xlsx',
+        sheet)
+    df_lr['Model'] = 'LR'
+    df_lr = df_lr.sort_values(by=['support'], ascending=[False])
+
+    df_gbm = _combine_balanced_and_all(
+        'output/save_cohort_all_loose/LIGHTGBM/results/summarized_IPTW_ATE_LIGHTGBM_finalInfo-withunbalanced.xlsx',
+        'output/save_cohort_all_loose/LIGHTGBM/results/summarized_IPTW_ATE_LIGHTGBM_finalInfo.xlsx',
+        sheet)
+    df_gbm['Model'] = 'GBM'
+
+    df_mlp = _combine_balanced_and_all(
+        'output/save_cohort_all_loose/MLP/results/summarized_IPTW_ATE_MLP_finalInfo-withunbalanced.xlsx',
+        'output/save_cohort_all_loose/MLP/results/summarized_IPTW_ATE_MLP_finalInfo.xlsx',
+        sheet)
+    df_mlp['Model'] = 'MLP'
+
+    df_lstm = _combine_balanced_and_all(
+        'output/save_cohort_all_loose/LSTM/results/summarized_IPTW_ATE_LSTM_finalInfo-withunbalanced.xlsx',
+        'output/save_cohort_all_loose/LSTM/results/summarized_IPTW_ATE_LSTM_finalInfo.xlsx',
+        sheet)
+    df_lstm['Model'] = 'LSTM'
+
+    writer = pd.ExcelWriter(dirname + 'results/summarized_IPTW_ATE_LR_finalInfo_cat_GBM-MLP-LSTM.xlsx',
+                            engine='xlsxwriter')
+
+    # col_name = ['drug', 'Drug', 'Model', 'niters', 'Support', 'Treat', 'Ctrl',
+    #             'n_feature', ' Unbalanced', 'Unbalanced IPTW', 'KM', 'HR']
+
+    # def significance(val):
+    #     if val < 0.001:
+    #         return '***'
+    #     elif val < 0.01:
+    #         return '**'
+    #     elif val < 0.05:
+    #         return '*'
+    #     else:
+    #         return 'ns'
+    #
+    # def return_select_content(key, row, null_model=''):
+    #     data = [key, ]
+    #     col1 = ['drug_name', 'Model', 'niters', 'support', 'n_treat', 'n_ctrl',
+    #             'n_feature', 'mean-n_unbalanced_feature', 'mean-n_unbalanced_feature_IPTW']
+    #     if null_model:
+    #         for c in col1:
+    #             data.append(row[c])
+    #         data[2] = null_model.upper()
+    #         data[4] = 0
+    #         data[5] = data[6] = data[7] = data[8] = data[9] = np.nan
+    #         data.append(np.nan)
+    #         data.append(np.nan)
+    #     else:
+    #         for c in col1:
+    #             data.append(row[c])
+    #         data.append(row['mean-KM1-0_IPTW'] + ' (' + row['mean_ci-KM1-0_IPTW'] + ')' + '$^{' + significance(
+    #             float(row['pvalue-KM1-0_IPTW'])) + '}$')
+    #         data.append(row['mean-HR_IPTW'] + ' (' + row['mean_ci-HR_IPTW'] + ')' + '$^{' + significance(
+    #             float(row['pvalue-HR_IPTW'])) + '}$')
+    #     return data
+
+    dflr = df_lr.set_index('drug')
+    dfgbm = df_gbm.set_index('drug')
+    dfmlp = df_mlp.set_index('drug')
+    dflstm = df_lstm.set_index('drug')
+
+    data = []
+    for key, row in dflr.iterrows():
+        if drug_list is not None:
+            if key not in drug_list:
+                continue
+        ## add test here, compared unbalanced feature after iptw, p-value
+        vn_all_lr, vn_balanced_lr = _get_no_unbalanced_iptw('output/revise_testset/save_cohort_all_loose/LR/results/',
+                                                            key, sheet)
+        vn_all_gbm, vn_balanced_gbm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LIGHTGBM/results/', key,
+                                                              sheet)
+        vn_all_mlp, vn_balanced_mlp = _get_no_unbalanced_iptw('output/save_cohort_all_loose/MLP/results/', key, sheet)
+        vn_all_lstm, vn_balanced_lstm = _get_no_unbalanced_iptw('output/save_cohort_all_loose/LSTM/results/', key,
+                                                                sheet)
+
+        pgbm, test_origgbm = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_gbm)
+        pgbm_balanced, test_origgbm_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_gbm)
+
+        pmlp, test_origmlp = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_mlp)
+        pmlp_balanced, test_origmlp_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_mlp)
+
+        plstm, test_origlstm = bootstrap_mean_pvalue_2samples(vn_all_lr, vn_all_lstm)
+        plstm_balanced, test_origlstm_balanced = bootstrap_mean_pvalue_2samples(vn_balanced_lr, vn_balanced_lstm)
+
+        row = row.copy()
+        row['p_2sample'] = np.nan
+        row['p_2sample_balanced'] = np.nan
+
+        row2 = dfgbm.loc[key, :].copy()
+        row2['p_2sample'] = test_origgbm.pvalue
+        row2['p_2sample_balanced'] = test_origgbm_balanced.pvalue
+
+        row3 = dfmlp.loc[key, :].copy()
+        row3['p_2sample'] = test_origmlp.pvalue
+        row3['p_2sample_balanced'] = test_origmlp_balanced.pvalue
+
+        row4 = dflstm.loc[key, :].copy()
+        row4['p_2sample'] = test_origlstm.pvalue
+        row4['p_2sample_balanced'] = test_origlstm_balanced.pvalue
+        ####
+        data.append(row)
+        data.append(row2)
+        data.append(row3)
+        data.append(row4)
+
+    df_final = pd.DataFrame(data=data)  # , columns=col_name
+    df_final.to_excel(writer, sheet_name=sheet)
+    writer.save()
+    print('Done results_ATE_for_ml_step3_finalInfo')
+
+
 def check_drug_name_code():
     df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
     rx_df = pd.read_csv(r'../ipreprocess/output/save_cohort_all_loose/cohort_all_name_size_positive_loose.csv',
@@ -1042,12 +1319,11 @@ def check_drug_name_code():
 
 
 def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
 
     c1 = 'success_rate-val_auc-i-all_n_unbalanced_feat_iptw'
-    # c2 = 'success_rate-train_loss-i-all_n_unbalanced_feat_iptw'
-    c2 = 'success_rate-val_loss-i-all_n_unbalanced_feat_iptw'
+    c2 = 'success_rate-val_loss-i-all_n_unbalanced_feat_iptw'  # 'success_rate-train_loss-i-all_n_unbalanced_feat_iptw'
     c3 = 'success_rate-trainval_n_unbalanced_feat_iptw-val_auc-all_n_unbalanced_feat_iptw'
 
     idx_auc = dfall[c1] >= 0.1
@@ -1181,9 +1457,10 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
         ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
 
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
+    # ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Train-Loss Select', 'Our Strategy'),
+    #           fontsize=25)  # , bbox_to_anchor=(1.13, 1.01))
     ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Val-Loss Select', 'Our Strategy'),
               fontsize=25)  # , bbox_to_anchor=(1.13, 1.01))
-
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
     plt.tight_layout()
@@ -1195,302 +1472,15 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     plt.clf()
 
 
-def bar_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
-                          sheet_name=contrl_type)
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
-    print('Total drug trials: ', len(idx))
-    print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
-    print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
-    print(r"#df['success_rate-val_maxsmd_nsmd'] > 0: ", idx_smd.sum(), '({:.2f}%)'.format(idx_smd.mean() * 100))
-
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-trainval_final_finalnsmd'], ascending=[False])
-    # df['nsmd_mean_ci-val_auc_nsmd']
-
-    N = len(df)
-    col = ['success_rate-val_auc_nsmd', 'success_rate-val_maxsmd_nsmd', 'success_rate-val_nsmd_nsmd',
-           'success_rate-train_maxsmd_nsmd', 'success_rate-train_nsmd_nsmd',
-           'success_rate-trainval_maxsmd_nsmd', 'success_rate-trainval_nsmd_nsmd',
-           'success_rate-trainval_final_finalnsmd']
-    legs = ['_'.join(x.split('-')[1].split('_')[:-1]) for x in col]
-    # col_ci = [x.replace('rate', 'rate_ci') for x in col]
-    top = []
-    top_ci = []
-    for c in col:
-        top.append(df.loc[:, c])
-        top_ci.append(np.array(df.loc[:, c.replace('rate', 'rate_ci')].apply(lambda x: stringlist_2_list(x)).to_list()))
-
-    pauc = np.array(df.loc[:, "p-succes-final-vs-auc"])
-    psmd = np.array(df.loc[:, "p-succes-final-vs-maxsmd"])
-    paucsmd = np.array(df.loc[:, "p-succes-auc-vs-maxsmd"])
-
-    xlabels = df.loc[:, 'drug_name']
-
-    width = 0.45  # the width of the bars
-    ind = np.arange(N) * width * (len(col) + 1)  # the x locations for the groups
-
-    colors = ['#FAC200', '#82A2D3', '#F65453']
-    fig, ax = plt.subplots(figsize=(24, 8))
-    error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
-    # plt.ylim([0, 1.05])
-    rects = []
-    for i in range(len(top)):
-        top_1 = top[i]
-        top_1_ci = top_ci[i]
-        if i <= 1 or i == len(top) - 1:
-            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
-                          error_kw=error_kw,
-                          color=colors[min(i, len(colors) - 1)], edgecolor=None)  # "black")
-        else:
-            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
-                          error_kw=error_kw,
-                          edgecolor="black")
-        rects.append(rect)
-
-    ax.set_xticks(ind + int(len(top) / 2) * width)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    # ax.spines['bottom'].set_color('#DDDDDD')
-    ax.set_axisbelow(True)
-    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
-    ax.yaxis.grid(True, color='#EEEEEE', which='both')
-    ax.xaxis.grid(False)
-    ax.set_xticklabels(xlabels, fontsize=20, rotation=45, ha='right')
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
-    ax.set_ylabel("Prop. of success balancing", fontsize=25)  # Success Rate of Balancing
-
-    def significance(val):
-        if val < 0.001:
-            return '***'
-        elif val < 0.01:
-            return '**'
-        elif val < 0.05:
-            return '*'
-        else:
-            return 'ns'
-
-    def labelvalue(rects, val, height=None):
-        for i, rect in enumerate(rects):
-            if height is None:
-                h = rect.get_height() * 1.02
-            else:
-                h = height[i] * 1.02
-            ax.text(rect.get_x() + rect.get_width() / 2., h,
-                    significance(val[i]),
-                    ha='center', va='bottom', fontsize=11)
-
-    for i in range(len(rects) - 1):
-        pv = np.array(df.loc[:, "p-succes-fvs-" + col[i].split('-')[-1]])
-        labelvalue((rects[i]), pv, top_ci[i][:, 1])
-
-    # labelvalue(rects1, pauc, top_1_ci[:,1])
-    # labelvalue(rects2, psmd, top_2_ci[:,1])
-
-    # for i, rect in enumerate(rects3):
-    #     d = 0.02
-    #     y = top_3_ci[i, 1] * 1.03  # rect.get_height()
-    #     w = rect.get_width()
-    #     x = rect.get_x()
-    #     x1 = x - 2 * w
-    #     x2 = x - 1 * w
-    #
-    #     y1 = top_1_ci[i, 1] * 1.03
-    #     y2 = top_2_ci[i, 1] * 1.03
-    #
-    #     # auc v.s. final
-    #     l, r = x1, x + w
-    #     ax.plot([l, l, (l+r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l+r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l+r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # smd v.s. final
-    #     l, r = x2 + 0.6*w, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # auc v.s. smd
-    #     l, r = x1, x2 + 0.4*w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
-
-    # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
-    ax.legend((rect[0] for rect in rects), (x for x in legs),
-              fontsize=18)  # , bbox_to_anchor=(1.13, 1.01))
-
-    # ax.autoscale(enable=True, axis='x', tight=True)
-    ax.set_xmargin(0.01)
-    plt.tight_layout()
-    if dump:
-        check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-all.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-all.pdf'.format(model, contrl_type))
-    plt.show()
-    plt.clf()
-
-
-def bar_plot_model_selectionV2_test(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
-                          sheet_name=contrl_type)
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
-    print('Total drug trials: ', len(idx))
-    print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
-    print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
-    print(r"#df['success_rate-val_maxsmd_nsmd'] > 0: ", idx_smd.sum(), '({:.2f}%)'.format(idx_smd.mean() * 100))
-
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-trainval_final_finalnsmd'], ascending=[False])
-    # df['nsmd_mean_ci-val_auc_nsmd']
-
-    N = len(df)
-    col = ['success_rate-val_auc_nsmd']  # , 'success_rate-val_maxsmd_nsmd']
-    # , 'success_rate-val_nsmd_nsmd',
-    #    'success_rate-train_maxsmd_nsmd', 'success_rate-train_nsmd_nsmd',
-    #    'success_rate-trainval_maxsmd_nsmd', 'success_rate-trainval_nsmd_nsmd',
-    #    'success_rate-trainval_final_finalnsmd']
-    legs = ['_'.join(x.split('-')[1].split('_')[:-1]) for x in col]
-    # col_ci = [x.replace('rate', 'rate_ci') for x in col]
-    top = []
-    top_ci = []
-    for c in col:
-        top.append(df.loc[:, c])
-        top_ci.append(np.array(df.loc[:, c.replace('rate', 'rate_ci')].apply(lambda x: stringlist_2_list(x)).to_list()))
-
-    pauc = np.array(df.loc[:, "p-succes-final-vs-auc"])
-    psmd = np.array(df.loc[:, "p-succes-final-vs-maxsmd"])
-    paucsmd = np.array(df.loc[:, "p-succes-auc-vs-maxsmd"])
-
-    xlabels = df.loc[:, 'drug_name']
-
-    width = 0.45  # the width of the bars
-    ind = np.arange(N) * width * (len(col) + 1)  # the x locations for the groups
-
-    colors = ['#FAC200', '#82A2D3', '#F65453']
-    fig, ax = plt.subplots(figsize=(24, 8))
-    error_kw = {'capsize': 3, 'capthick': 1, 'ecolor': 'black'}
-    plt.ylim([0, 1.1])
-    rects = []
-    for i in range(len(top)):
-        top_1 = top[i]
-        top_1_ci = top_ci[i]
-        if i <= 1 or i == len(top) - 1:
-            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
-                          error_kw=error_kw,
-                          color=colors[min(i, len(colors) - 1)], edgecolor=None)  # "black")
-        else:
-            rect = ax.bar(ind + width * i, top_1, width, yerr=[top_1 - top_1_ci[:, 0], top_1_ci[:, 1] - top_1],
-                          error_kw=error_kw,
-                          edgecolor="black")
-        rects.append(rect)
-
-    ax.set_xticks(ind + int(len(top) / 2) * width)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    # ax.spines['bottom'].set_color('#DDDDDD')
-    ax.set_axisbelow(True)
-    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
-    ax.yaxis.grid(True, color='#EEEEEE', which='both')
-    ax.xaxis.grid(False)
-    ax.set_xticklabels(xlabels, fontsize=20, rotation=45, ha='right')
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
-    ax.set_ylabel("Prop. of success balancing", fontsize=25)  # Success Rate of Balancing
-
-    def significance(val):
-        if val < 0.001:
-            return '***'
-        elif val < 0.01:
-            return '**'
-        elif val < 0.05:
-            return '*'
-        else:
-            return 'ns'
-
-    def labelvalue(rects, val, height=None):
-        for i, rect in enumerate(rects):
-            if height is None:
-                h = rect.get_height() * 1.02
-            else:
-                h = height[i] * 1.02
-            ax.text(rect.get_x() + rect.get_width() / 2., h,
-                    significance(val[i]),
-                    ha='center', va='bottom', fontsize=11)
-
-    for i in range(len(rects) - 1):
-        pv = np.array(df.loc[:, "p-succes-fvs-" + col[i].split('-')[-1]])
-        labelvalue((rects[i]), pv, top_ci[i][:, 1])
-
-    # labelvalue(rects1, pauc, top_1_ci[:,1])
-    # labelvalue(rects2, psmd, top_2_ci[:,1])
-
-    # for i, rect in enumerate(rects3):
-    #     d = 0.02
-    #     y = top_3_ci[i, 1] * 1.03  # rect.get_height()
-    #     w = rect.get_width()
-    #     x = rect.get_x()
-    #     x1 = x - 2 * w
-    #     x2 = x - 1 * w
-    #
-    #     y1 = top_1_ci[i, 1] * 1.03
-    #     y2 = top_2_ci[i, 1] * 1.03
-    #
-    #     # auc v.s. final
-    #     l, r = x1, x + w
-    #     ax.plot([l, l, (l+r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l+r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l+r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # smd v.s. final
-    #     l, r = x2 + 0.6*w, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # auc v.s. smd
-    #     l, r = x1, x2 + 0.4*w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
-
-    # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
-    ax.legend((rect[0] for rect in rects), (x for x in legs),
-              fontsize=18)  # , bbox_to_anchor=(1.13, 1.01))
-
-    # ax.autoscale(enable=True, axis='x', tight=True)
-    ax.set_xmargin(0.01)
-    plt.tight_layout()
-    if dump:
-        check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-auc.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/fig/balance_rate_barplot-{}-{}-auc.pdf'.format(model, contrl_type))
-    plt.show()
-    plt.clf()
-
 
 def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contrl_type='random', dump=True,
                                                    colorful=True, datapart='all', log=False):
     # dataset: train, test, all
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
-    # c2 = 'train_loss-i'
-    c2 = 'val_loss-i'
+    c2 = 'val_loss-i'  # c2 = 'train_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
     c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  # val_loss
 
@@ -1627,7 +1617,7 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
 
 
 def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/revise_testset/{}/{}/'.format(cohort_dir_name, model)
+    dirname = r'output/revise_testset64/{}/{}/'.format(cohort_dir_name, model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'success_rate-val_auc-i-all_n_unbalanced_feat_iptw'
@@ -1783,553 +1773,57 @@ def box_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
     plt.clf()
 
 
-def box_plot_model_selectionV2(cohort_dir_name, model, contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}-More.xlsx'.format(model),
-                          sheet_name=contrl_type, converters={'drug': str})
-    idx = dfall['success_rate-trainval_final_finalnsmd'] >= 0.1
-    idx_auc = dfall['success_rate-val_auc_nsmd'] >= 0.1
-    idx_smd = dfall['success_rate-val_maxsmd_nsmd'] >= 0.1
-    print('Total drug trials: ', len(idx))
-    print(r"#df['success_rate-trainval_final_finalnsmd'] > 0: ", idx.sum(), '({:.2f}%)'.format(idx.mean() * 100))
-    print(r"#df['success_rate-val_auc_nsmd'] > 0: ", idx_auc.sum(), '({:.2f}%)'.format(idx_auc.mean() * 100))
-    print(r"#df['success_rate-val_maxsmd_nsmd'] > 0: ", idx_smd.sum(), '({:.2f}%)'.format(idx_smd.mean() * 100))
-
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-trainval_final_finalnsmd'], ascending=[False])
-    # df['nsmd_mean_ci-val_auc_nsmd']
-
-    N = len(df)
-    drug_list = df.loc[idx, 'drug']
-    drug_name_list = df.loc[idx, 'drug_name']
-    col = ['val_auc_testauc', 'val_maxsmd_testauc', 'val_nsmd_testauc',
-           'train_maxsmd_testauc', 'train_nsmd_testauc',
-           'trainval_maxsmd_testauc', 'trainval_nsmd_testauc',
-           'trainval_final_testnauc']
-    legs = ['_'.join(x.split('_')[:-1]) for x in col]
-    data_list = [[] for i in range(len(col))]
-    data_1 = []
-    data_2 = []
-    data_3 = []
-    data_pvalue = []
-    for drug in drug_list:
-        rdf = pd.read_csv(dirname + 'results/' + drug + '_model_selection.csv')
-        if contrl_type != 'all':
-            idx = rdf['ctrl_type'] == contrl_type
-        else:
-            idx = rdf['ctrl_type'].notna()
-        for i in range(len(col)):
-            data_list[i].append(np.array(rdf.loc[idx, col[i]]))
-
-        p_v = []
-        for i in range(1, len(col)):
-            a = data_list[0][-1]
-            b = data_list[i][-1]
-            p, test_orig = bootstrap_mean_pvalue_2samples(a, b)
-            p_v.append(test_orig[1])
-        data_pvalue.append(p_v)
-
-    colors = ['#FAC200', '#82A2D3', '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#F65453']
-    # color_others = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    fig, ax = plt.subplots(figsize=(24, 8))
-    width = 0.5  # the width of the bars
-    ind = np.arange(N) * width * (len(col) + 1)  # the x locations for the groups
-    sym = 'o'
-    # 'meanline':True,
-    box_kw = {"sym": sym, "widths": width - 0.08, "patch_artist": True, "notch": True,
-              'showmeans': True,  # 'meanline':True,
-              "meanprops": dict(linestyle='--', linewidth=1, markeredgecolor='purple', marker='^',
-                                markerfacecolor="None")}
-    rects = []
-    for i, data in enumerate(data_list):
-        rect = plt.boxplot(data, positions=ind + i * width, **box_kw)
-        rects.append(rect)
-
-    def plot_strip(ind, data, color=None):
-        w = width - 0.15
-        swarm1 = pd.DataFrame([(ind[i], data[i][j]) for i in range(len(ind)) for j in range(len(data[i]))],
-                              columns=['x', 'y'])
-        strip_rx = stats.uniform(-w / 2., w).rvs(len(swarm1))
-        # sns.stripplot(x='x', y='y', data=swarm1, color=".25", alpha=0.2, ax=ax)
-        if color is None:
-            plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=0.2)
-        else:
-            plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=0.2, c=color)
-
-    # ticks = list(drug_name_list)
-    for i, bplot in enumerate(rects):
-        for patch in bplot['boxes']:
-            patch.set_facecolor(colors[i])
-            r, g, b, a = patch.get_facecolor()
-            patch.set_facecolor((r, g, b, 0.7))
-        # plt.setp(bplot['boxes'], color=color)
-        # plt.setp(bplot['whiskers'], color=color)
-        # plt.setp(bplot['caps'], color=color)
-        plt.setp(bplot['medians'], color='black')
-
-    for i, data in enumerate(data_list):
-        plot_strip(ind + i * width, data, colors[i])
-
-    # plt.ylim([0.5, 0.85])
-    ax.set_xticks(ind + int(len(col) / 2) * width)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    # ax.spines['bottom'].set_color('#DDDDDD')
-    ax.set_axisbelow(True)
-    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
-    ax.yaxis.grid(True, color='#EEEEEE', which='both')
-    ax.xaxis.grid(False)
-    ax.set_xticklabels(drug_name_list, fontsize=20, rotation=45, ha='right')
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
-    ax.set_ylabel("Test AUC", fontsize=25)
-
-    def significance(val):
-        if val < 0.001:
-            return '***'
-        elif val < 0.01:
-            return '**'
-        elif val < 0.05:
-            return '*'
-        else:
-            return 'ns'
-
-    # def labelvalue(rects, x, y, p):
-    #     for i, rect in enumerate(rects):
-    #         ax.text(x[i], y[i],
-    #                 significance(p[i]),
-    #                 ha='center', va='bottom', fontsize=11)
-    #
-    # labelvalue(rects1["boxes"], ind - 0.08, np.max(data_1, axis=1)*1.01, np.array(data_pvalue)[:,0])
-    # labelvalue(rects2["boxes"], ind + width, np.max(data_2, axis=1)*1.01, np.array(data_pvalue)[:,1])
-
-    p_v = np.array(data_pvalue)
-    for i in range(N):
-        d = 0.008
-        for j in range(1, len(col)):
-            y = data_list[j][i].max() * 1.01
-            x = ind[i] + j * width
-            ax.text(x, y + d, significance(p_v[i, j - 1]), ha='center', va='bottom', fontsize=9)
-        # y = np.max([data_1[i].max(), data_2[i].max(), data_3[i].max()]) * 1.01  # rect.get_height()
-        # x = ind[i] + 2 * width + 0.08  # + width/2
-        # x1 = ind[i] - 0.08  # - width/2
-        # x2 = ind[i] + width  # - width/2
-        #
-        # # auc v.s. smd
-        # l, r = x - 0.5*width, x2 - 0.08
-        # ax.plot([x1, x1, (x2 + x1) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-        # ax.plot([(x2 + x1) / 2, x2 - 0.08, x2-0.08], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-        # ax.text((x2 + x1) / 2, y + d, significance(p_v[i, 2]), ha='center', va='bottom', fontsize=12)
-        #
-        # # auc v.s. final
-        # ax.plot([x1, x1, (x + x1) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-        # ax.plot([(x + x1) / 2, x, x], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-        # # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c="black")
-        # ax.text((x + x1) / 2, y + 3 * d, significance(p_v[i, 0]), ha='center', va='bottom', fontsize=12)
-        #
-        # # smd v.s. final
-        # ax.plot([x2+0.08, x2+0.08, (x + x2) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-        # ax.plot([(x + x2) / 2, x, x], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-        # # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c="black")
-        # ax.text((x + x2) / 2, y + 1 * d, significance(p_v[i, 1]), ha='center', va='bottom', fontsize=12)
-
-    ax.legend((rect["boxes"][0] for rect in rects),
-              (x for x in legs),
-              fontsize=15)
-    ax.set_xmargin(0.01)
-    plt.tight_layout()
-    if dump:
-        check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}-all.png'.format(model, contrl_type))
-        fig.savefig(dirname + 'results/fig/test_auc_boxplot-{}-{}-all.pdf'.format(model, contrl_type))
-    plt.show()
-    plt.clf()
-
-
-def box_plot_ate(cohort_dir_name, model, model2='LSTM', contrl_type='random', dump=True, colorful=True):
-    dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-    dirname2 = r'output/{}/{}/'.format(cohort_dir_name, model2)
-    df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model),
-                           dtype={'drug': str},
-                           sheet_name=None)
-
-    df_all2 = pd.read_excel(dirname2 + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model2),
-                            dtype={'drug': str},
-                            sheet_name=None)
-
-    df = df_all[contrl_type]
-    # Only select drugs with selection criteria trial
-    # 1. minimum support set 10, may choose 20 later
-    # 2. p value < 0.05
-    idx = (df['support'] >= 50) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
-    df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
-
-    df2 = df_all2[contrl_type]
-    idx2 = (df2['support'] >= 50) & (df2['pvalue-KM1-0_IPTW'] <= 0.05)
-    df_sort2 = df2.loc[idx2, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
-
-    data_1 = []
-    data_2 = []
-    data_pvalue = []
-    drug_list = df_sort['drug'].tolist()
-    drug_name_list = df_sort['drug_name'].tolist()
-    drug_list2 = df_sort2['drug'].tolist()
-    print('len(drug_list):', len(drug_list), 'len(drug_list2)', len(drug_list2))
-    N = len(drug_list)
-    n_box = 2
-    for drug in drug_list:
-        rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
-
-        if contrl_type != 'all':
-            idx_all = (rdf['ctrl_type'] == contrl_type)
-        else:
-            idx_all = (rdf['ctrl_type'].notna())
-
-        # Only select balanced trial
-        idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
-        c = "KM1-0_IPTW"  # "ATE_original", "ATE_IPTW", "KM1-0_original", "KM1-0_IPTW", 'HR_ori', 'HR_IPTW'
-        nv = rdf.loc[idx, c]
-        data_1.append(np.array(rdf.loc[idx, c]) * 100)
-
-        rdf2 = pd.read_excel(dirname2 + 'results/' + drug + '_results.xlsx')
-        if contrl_type != 'all':
-            idx_all2 = (rdf['ctrl_type'] == contrl_type)
-        else:
-            idx_all2 = (rdf['ctrl_type'].notna())
-        # Only select balanced trial
-        idx2 = idx_all2 & (rdf2['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
-        nv2 = rdf.loc[idx2, c]
-        if drug in drug_list2:
-            data_2.append(np.array(rdf2.loc[idx2, c]) * 100)
-        else:
-            data_2.append(np.array([]))
-
-        # if len(nv) > 0:
-        #     med = IQR(nv)[0]
-        #     iqr = IQR(nv)[1:]
-        #
-        #     mean = nv.mean()
-        #     mean_ci, _ = bootstrap_mean_ci(nv, alpha=0.05)
-        #
-        #     if 'HR' in c:
-        #         p, _ = bootstrap_mean_pvalue(nv, expected_mean=1)
-        #     else:
-        #         p, _ = bootstrap_mean_pvalue(nv, expected_mean=0)
-        #
-        #     r.extend([med, iqr, mean, mean_ci, p])
-        # else:
-        #     r.extend([np.nan, np.nan, np.nan, np.nan, np.nan])
-
-    colors = ['#F65453', '#82A2D3', '#FAC200']
-    fig, ax = plt.subplots(figsize=(12, 8))  # 18
-    width = 0.35  # 0.5 #the width of the bars
-    ind = np.arange(N) * width * (n_box + 1)  # the x locations for the groups
-    sym = 'o'
-    # 'meanline':True,
-    box_kw = {"sym": sym, "widths": width - 0.04, "patch_artist": True, "notch": True,
-              'showmeans': True,  # 'meanline':True,
-              "meanprops": dict(linestyle='--', linewidth=1, markeredgecolor='black', marker='^',
-                                markerfacecolor="None")}
-    rects1 = plt.boxplot(data_1, positions=ind, **box_kw)
-    rects2 = plt.boxplot(data_2, positions=ind + width, **box_kw)
-
-    # rects3 = plt.boxplot(data_3, positions=ind + 2 * width + 0.08, **box_kw)
-
-    def plot_strip(ind, data, color):
-        w = width - 0.15
-        swarm1 = pd.DataFrame([(ind[i], data[i][j]) for i in range(len(ind)) for j in range(len(data[i]))],
-                              columns=['x', 'y'])
-        strip_rx = stats.uniform(-w / 2., w).rvs(len(swarm1))
-        # sns.stripplot(x='x', y='y', data=swarm1, color=".25", alpha=0.2, ax=ax)
-        plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=.6, c=color)
-        # plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=1, facecolors='none', edgecolors=color)  # c=color) #,
-
-    # ticks = list(drug_name_list)
-    for i, bplot in enumerate([rects1, rects2]):
-        for patch in bplot['boxes']:
-            patch.set_facecolor(colors[i])
-            r, g, b, a = patch.get_facecolor()
-            patch.set_facecolor((r, g, b, .6))
-        # plt.setp(bplot['boxes'], color=color)
-        # plt.setp(bplot['whiskers'], color=color)
-        # plt.setp(bplot['caps'], color=color)
-        plt.setp(bplot['medians'], color='black')
-
-    plot_strip(ind, data_1, colors[0])
-    plot_strip(ind + width, data_2, colors[1])
-    # plot_strip(ind + 2 * width + 0.08, data_3, colors[2])
-
-    # plt.ylim([0.5, 0.85])
-    ax.set_xticks(ind + width / 2)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    # ax.spines['bottom'].set_color('#DDDDDD')
-    ax.set_axisbelow(True)
-    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
-    ax.yaxis.grid(True, color='#EEEEEE', which='both')
-    ax.xaxis.grid(False)
-    ax.set_xticklabels(drug_name_list, fontsize=20, rotation=45, ha='right')
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
-    ax.set_ylabel("Adjusted survival difference %", fontsize=25)
-    plt.axhline(y=0., color='black', linestyle='--')
-
-    def significance(val):
-        if val < 0.001:
-            return '***'
-        elif val < 0.01:
-            return '**'
-        elif val < 0.05:
-            return '*'
-        else:
-            return 'ns'
-
-    for i in range(N):
-        n1 = len(data_1[i])
-        n2 = len(data_2[i])
-        y1 = max(data_1[i]) * 1.02
-        try:
-            y2 = max(data_2[i]) * 1.02
-        except:
-            y2 = y1
-        x1 = ind[i]
-        x2 = ind[i] + width
-        ax.text(x1, y1, str(n1), ha='center', va='bottom', fontsize=14)
-        ax.text(x2, y2, str(n2), ha='center', va='bottom', fontsize=14)
-
-    # def labelvalue(rects, x, y, p):
-    #     for i, rect in enumerate(rects):
-    #         ax.text(x[i], y[i],
-    #                 significance(p[i]),
-    #                 ha='center', va='bottom', fontsize=11)
-    #
-    # labelvalue(rects1["boxes"], ind - 0.08, np.max(data_1, axis=1)*1.01, np.array(data_pvalue)[:,0])
-    # labelvalue(rects2["boxes"], ind + width, np.max(data_2, axis=1)*1.01, np.array(data_pvalue)[:,1])
-
-    # p_v = np.array(data_pvalue)
-    # for i in range(N):
-    #     d = 0.008
-    #     y = np.max([data_1[i].max(), data_2[i].max(), data_3[i].max()]) * 1.01  # rect.get_height()
-    #     x = ind[i] + 2 * width + 0.08  # + width/2
-    #     x1 = ind[i] - 0.08  # - width/2
-    #     x2 = ind[i] + width  # - width/2
-    #
-    #     # auc v.s. smd
-    #     l, r = x - 0.5 * width, x2 - 0.08
-    #     ax.plot([x1, x1, (x2 + x1) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(x2 + x1) / 2, x2 - 0.08, x2 - 0.08], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.text((x2 + x1) / 2, y + d, significance(p_v[i, 2]), ha='center', va='bottom', fontsize=12)
-    #
-    #     # auc v.s. final
-    #     ax.plot([x1, x1, (x + x1) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(x + x1) / 2, x, x], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c="black")
-    #     ax.text((x + x1) / 2, y + 3 * d, significance(p_v[i, 0]), ha='center', va='bottom', fontsize=12)
-    #
-    #     # smd v.s. final
-    #     ax.plot([x2 + 0.08, x2 + 0.08, (x + x2) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.plot([(x + x2) / 2, x, x], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c="black")
-    #     ax.text((x + x2) / 2, y + 1 * d, significance(p_v[i, 1]), ha='center', va='bottom', fontsize=12)
-
-    ax.legend((rects1["boxes"][0], rects2["boxes"][0]),
-              (model, model2), fontsize=20)
-    ax.set_xmargin(0.01)
-    plt.tight_layout()
-    if dump:
-        check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(
-            dirname + 'results/fig/adjusted_survival_diff_boxplot-{}-{}-{}.png'.format(model, model2, contrl_type))
-        fig.savefig(
-            dirname + 'results/fig/adjusted_survival_diff_boxplot-{}-{}-{}.pdf'.format(model, model2, contrl_type))
-    plt.show()
-    plt.clf()
-
-
-def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random', dump=True):
-    dirname_list = []
-    df_all_list = []
-    data_list = []
-    for model in models:
-        dirname = r'output/{}/{}/'.format(cohort_dir_name, model)
-        df_all = pd.read_excel(dirname + 'results/summarized_IPTW_ATE_{}.xlsx'.format(model),
-                               dtype={'drug': str},
-                               sheet_name=None)
-        dirname_list.append(dirname)
-        df_all_list.append(df_all)
-
-        df = df_all[contrl_type]
-        # Only select drugs with selection criteria trial
-        # 1. minimum support set 10, may choose 20 later
-        # 2. p value < 0.05
-        idx = (df['support'] >= 50) & (df['pvalue-KM1-0_IPTW'] <= 0.05)
-        df_sort = df.loc[idx, :].sort_values(by=['mean-KM1-0_IPTW'], ascending=[False])
-
-        data = []
-        data_pvalue = []
-        if model == 'LR':
-            drug_list = df_sort['drug'].tolist()
-            drug_name_list = df_sort['drug_name'].tolist()
-            print('len(drug_list):', len(drug_list))
-            N = len(drug_list)
-            n_box = len(models)
-
-        drug_list2 = df_sort['drug'].tolist()
-        for drug in drug_list:
-            rdf = pd.read_excel(dirname + 'results/' + drug + '_results.xlsx')
-
-            if contrl_type != 'all':
-                idx_all = (rdf['ctrl_type'] == contrl_type)
-            else:
-                idx_all = (rdf['ctrl_type'].notna())
-
-            # Only select balanced trial
-            idx = idx_all & (rdf['n_unbalanced_feature_IPTW'] <= MAX_NO_UNBALANCED_FEATURE)
-            c = "KM1-0_IPTW"  # "ATE_original", "ATE_IPTW", "KM1-0_original", "KM1-0_IPTW", 'HR_ori', 'HR_IPTW'
-            nv = rdf.loc[idx, c]
-            if drug in drug_list2:
-                data.append(np.array(rdf.loc[idx, c]) * 100)
-            else:
-                data.append(np.array([]))
-
-        data_list.append(data)
-
-    colors = ['#F65453', '#82A2D3', '#FAC200', 'purple']
-    fig, ax = plt.subplots(figsize=(18, 8))
-    width = 0.5  # the width of the bars
-    ind = np.arange(N) * width * (n_box + 1)  # the x locations for the groups
-    sym = 'o'
-    # 'meanline':True,
-    box_kw = {"sym": sym, "widths": width - 0.04, "patch_artist": True, "notch": True,
-              'showmeans': True,  # 'meanline':True,
-              "meanprops": dict(linestyle='--', linewidth=1, markeredgecolor='black', marker='^',
-                                markerfacecolor="None")}
-
-    rects_list = []
-    for i in range(len(data_list)):
-        rects = plt.boxplot(data_list[i], positions=ind + i * width, **box_kw)
-        rects_list.append(rects)
-
-    def plot_strip(ind, data, color):
-        w = width - 0.15
-        swarm1 = pd.DataFrame([(ind[i], data[i][j]) for i in range(len(ind)) for j in range(len(data[i]))],
-                              columns=['x', 'y'])
-        strip_rx = stats.uniform(-w / 2., w).rvs(len(swarm1))
-        # sns.stripplot(x='x', y='y', data=swarm1, color=".25", alpha=0.2, ax=ax)
-        plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=.6, c=color)
-        # plt.scatter(swarm1['x'] + strip_rx, swarm1['y'], alpha=1, facecolors='none', edgecolors=color)  # c=color) #,
-
-    # ticks = list(drug_name_list)
-    for i, bplot in enumerate(rects_list):
-        for patch in bplot['boxes']:
-            patch.set_facecolor(colors[i])
-            r, g, b, a = patch.get_facecolor()
-            patch.set_facecolor((r, g, b, .6))
-        # plt.setp(bplot['boxes'], color=color)
-        # plt.setp(bplot['whiskers'], color=color)
-        # plt.setp(bplot['caps'], color=color)
-        plt.setp(bplot['medians'], color='black')
-
-    for i in range(len(data_list)):
-        plot_strip(ind + i * width, data_list[i], colors[i])
-
-    # plt.ylim([0.5, 0.85])
-    ax.set_xticks(ind + width / 2)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    # ax.spines['bottom'].set_color('#DDDDDD')
-    ax.set_axisbelow(True)
-    ax.yaxis.set_minor_locator(tck.AutoMinorLocator())
-    ax.yaxis.grid(True, color='#EEEEEE', which='both')
-    ax.xaxis.grid(False)
-    ax.set_xticklabels(drug_name_list, fontsize=20, rotation=45, ha='right')
-    ax.tick_params(axis='both', which='major', labelsize=20)
-    ax.set_xlabel("Drug Trials", fontsize=25)
-    ax.set_ylabel("Adjusted survival difference %", fontsize=25)
-    plt.axhline(y=0., color='black', linestyle='--')
-
-    def significance(val):
-        if val < 0.001:
-            return '***'
-        elif val < 0.01:
-            return '**'
-        elif val < 0.05:
-            return '*'
-        else:
-            return 'ns'
-
-    # for d in range(len(data_list)):
-    #     data = data_list[d]
-    #     for i in range(N):
-    #         n1 = len(data[i])
-    #         n2 = len(data_2[i])
-    #         y1 = max(data_1[i]) * 1.02
-    #         try:
-    #             y2 = max(data_2[i]) * 1.02
-    #         except:
-    #             y2 = y1
-    #         x1 = ind[i]
-    #         x2 = ind[i] + width
-    #         ax.text(x1, y1, str(n1), ha='center', va='bottom', fontsize=14)
-    #         ax.text(x2, y2, str(n2), ha='center', va='bottom', fontsize=14)
-
-    ax.legend((rects["boxes"][0] for rects in rects_list),
-              (m if m != 'LIGHTGBM' else 'GBM' for m in models), fontsize=20)
-    ax.set_xmargin(0.01)
-    plt.tight_layout()
-    if dump:
-        dirname = dirname_list[0]
-        check_and_mkdir(dirname + 'results/fig/')
-        fig.savefig(
-            dirname + 'results/fig/adjusted_survival_diff_boxplot-modelall-{}.png'.format(contrl_type))
-        fig.savefig(
-            dirname + 'results/fig/adjusted_survival_diff_boxplot-modelall-{}.pdf'.format(contrl_type))
-    plt.show()
-    plt.clf()
-
-
 if __name__ == '__main__':
+    """
+    0. based on revision 1
+    1. organized shells
+    2. change train loss to val loss as model selection baseline
+    """
+    # check_drug_name_code()
+    # test bootstrap method
+
+    # rvs = stats.norm.rvs(loc=0, scale=10, size=(100, 1))
+    # # ci = bootstrap_mean_ci(rvs)
+    # # p, test_orig = bootstrap_mean_pvalue(rvs, expected_mean=0., B=1000)
+    #
+    # rvs2 = stats.norm.rvs(loc=0, scale=10, size=(100, 1))
+    # p, test_orig = bootstrap_mean_pvalue_2samples(rvs, rvs2)
+
     with open(r'pickles/rxnorm_label_mapping.pkl', 'rb') as f:
         drug_name = pickle.load(f)
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
+    ## Part 1 -- Shells for running
+    # df_drug = pd.read_csv(
+    #     r'output/revise_testset/save_cohort_all_loose/LR/results/selected_balanced_drugs_for_screen.csv',
+    #     dtype={'drug': str})
+    # drug_list = df_drug['drug'].to_list()  # + ['6809', '135447'] # metformin, donepezil
+    # shell_for_ml_selected_drugs(drug_list, cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
+    #                             stats=False, more_para='--train_ratio 0.6', folder='revise_testset64')
+
+    # 2023-1-11
+    # drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
+    # shell_for_ml_selected_drugs_5yrs(
+    #     drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,
+    #     stats=False)
+    # split_shell_file('revise_f5yrs_shell_LR_save_cohort_all_loose_f5yrs_selected.sh', divide=3, skip_first=1)
+    #
+    #
+    # sys.exit(0)
+
+    print('Part 2 - Model selection')
+    ## Part 2 - Model selection, primary and sensitivity analysis
     cohort_dir_name = 'save_cohort_all_loose'
-    model = 'LSTM'  # 'MLP'  #'LIGHTGBM'  # 'MLP'  #'LR'  #'LSTM' #
+    model = 'LR'  # only LR
     results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
     results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name) # needs update and rerun
 
-    # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-
-    # results_ATE_for_ml(cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    # results_ATE_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(cohort_dir_name, model)
-
-    #
-    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
-    #
-    # major plots from 3 methods
+    print('Part 3 - Model selection Visualization')
+    ## Part 3 - Model selection Visualization, primary and sensitivity analysis
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # zz
-    # sys.exit(0)
-
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random',
-    #                                                datapart='test')
-    #
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc',
-    #                                                datapart='test')
 
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='all')
@@ -2338,46 +1832,4 @@ if __name__ == '__main__':
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='test')
 
-    zzz
 
-    sys.exit(0)
-    #
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    sys.exit(0)
-
-    # # # ## all methods plots in appendix
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selectionV2_test(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # # #
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
-
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='all')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
-    #
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='atc')
-    #
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='random')
-
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random')
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='atc')
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
-
-    print('Done')

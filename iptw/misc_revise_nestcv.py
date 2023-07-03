@@ -674,7 +674,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
                          dtype=np.float64)
             y1 = np.array(rdf.loc[idx, "val_auc-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
-            y2 = np.array(rdf.loc[idx, "train_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
+            y2 = np.array(rdf.loc[idx, "val_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
             p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
             p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
@@ -1778,17 +1778,17 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
 
     idx_auc = dfall['success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'] >= 0.1
     idx_smd = dfall['success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'] >= 0.1
-    idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'] >= 0.1
+    idx = dfall['success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'] >= 0.1
 
     print('Total drug trials: ', len(idx))
     print(r"#df[{}] > 0: ".format('success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'), idx_auc.sum(),
           '({:.2f}%)'.format(idx_auc.mean() * 100))
     print(r"#df[{}] > 0: ".format('success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'), idx_smd.sum(),
           '({:.2f}%)'.format(idx_smd.mean() * 100))
-    print(r"#df[{}] > 0: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
+    print(r"#df[{}] > 0: ".format('success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
           '({:.2f}%)'.format(idx.mean() * 100))
 
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
+    df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
     # df['nsmd_mean_ci-val_auc_nsmd']
 
     N = len(df)
@@ -2589,24 +2589,25 @@ if __name__ == '__main__':
     # change from 'save_cohort_all_loose', balance results should be same, only difference is ate part
     cohort_dir_name = 'save_cohort_all_loose_f5yrs'
     model = 'LR'  # 'MLP'   #'LIGHTGBM'   #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
 
     # 2023-6-27 Revise 2---Step 3, aggregate ate results
 
     # plot bar plot, for balance:
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
+    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
 
-    # ploar arrow plot for balance
+    # plot arrow plot for balance
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='all')
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='train')
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
                                                    datapart='test')
+
     zz
     # 2023-1-09 collider exp
     # shell_for_ml_selectcov(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50, stats=False)
