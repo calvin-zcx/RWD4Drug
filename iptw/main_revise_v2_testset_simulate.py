@@ -96,7 +96,7 @@ def parse_args():
         from datetime import datetime
         rseed = datetime.now()
 
-    args.treated_drug = args.treated_drug + 'n{}train{:.2f}'.format(args.nsim, args.train_ratio)
+    args.treated_drug = args.treated_drug + 'n{}train{:.2f}{}'.format(args.nsim, args.train_ratio, args.covspecs)
     args.random_seed = rseed
     args.save_model_filename = os.path.join(args.output_dir, args.treated_drug,
                                             args.treated_drug + '_S{}D{}C{}_{}'.format(args.random_seed,
@@ -211,6 +211,7 @@ if __name__ == "__main__":
 
     z = np.random.binomial(1, p=(1/(1+np.exp(-logits))))
     # parser.add_argument('--covspecs', choices=['correct', 'partial', 'incorrect'], default='correct')
+    print('covspecs:', args.covspecs)
     if args.covspecs == 'incorrect':
         X = np.stack((x1, x2, x3, x4, x5, x6), axis=1)
         X = np.concatenate((X, x_h1, x_h2), axis=1)
@@ -362,7 +363,6 @@ if __name__ == "__main__":
         results_all_list, results_all_df = final_eval_ml_CV_revise_traintest(
             model, args, train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
             {'simu':'simu', args.treated_drug:args.treated_drug}, np.array([str(i+1) for i in range(n_feature)]), n_feature, dump_ori=False)
-
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 

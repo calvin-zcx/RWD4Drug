@@ -2278,7 +2278,7 @@ def box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], c
 
 if __name__ == '__main__':
     # 2023-7-6
-    shell_for_ml_simulation('LR', niter=100, start=0, more_para='') #
+    shell_for_ml_simulation('LR', niter=50, start=0, more_para='')  #
     split_shell_file("simulate_v2_shell_LR.sh", divide=4, skip_first=1)
 
     # shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
