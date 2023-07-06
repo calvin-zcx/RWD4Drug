@@ -667,7 +667,7 @@ def results_model_selection_for_ml_step2(cohort_dir_name, model, drug_name):
                          dtype=np.float64)
             y1 = np.array(rdf.loc[idx, "val_auc-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
-            y2 = np.array(rdf.loc[idx, "train_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
+            y2 = np.array(rdf.loc[idx, "val_loss-i-all_n_unbalanced_feat_iptw"] <= MAX_NO_UNBALANCED_FEATURE,
                           dtype=np.float64)
             p1, test_orig1 = bootstrap_mean_pvalue_2samples(x, y1)
             p2, test_orig2 = bootstrap_mean_pvalue_2samples(x, y2)
@@ -1767,22 +1767,22 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
     c2 = 'val_loss-i'  # c2 = 'train_loss-i'
-    c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
+    # c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
     c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  # val_loss
 
     idx_auc = dfall['success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'] >= 0.1
     idx_smd = dfall['success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'] >= 0.1
-    idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'] >= 0.1
+    idx = dfall['success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'] >= 0.1
 
     print('Total drug trials: ', len(idx))
     print(r"#df[{}] > 0: ".format('success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'), idx_auc.sum(),
           '({:.2f}%)'.format(idx_auc.mean() * 100))
     print(r"#df[{}] > 0: ".format('success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'), idx_smd.sum(),
           '({:.2f}%)'.format(idx_smd.mean() * 100))
-    print(r"#df[{}] > 0: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
+    print(r"#df[{}] > 0: ".format('success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
           '({:.2f}%)'.format(idx.mean() * 100))
 
-    df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
+    df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c3 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
     # df['nsmd_mean_ci-val_auc_nsmd']
 
     N = len(df)
@@ -2655,8 +2655,8 @@ if __name__ == '__main__':
     ## Part 2 - Model selection, primary and sensitivity analysis
     cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
-    # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50)
+    results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name) # needs update and rerun
 
     print('Part 3 - Model selection Visualization')
