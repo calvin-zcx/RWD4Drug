@@ -205,6 +205,7 @@ if __name__ == "__main__":
 
     logits = -3.1 + np.log(3) * x2**2 + np.log(1.5) * x3 + np.log(1.5) * x5 + np.log(2) * x6 + np.log(3) * x_h1.sum(axis=1) + np.log(1.1) * x_h1.sum(axis=1)
     # logits = -1.2 + np.log(3) * x2**2 + np.log(1.5) * x3 + np.log(1.5) * x5 + np.log(2) * x6
+    logits = -2.85 + np.log(1.5) * x2**2 + np.log(3) * x3 * x2 + np.log(1.5) * x5 + np.log(2) * x6 + np.log(3) * x_h1.sum(axis=1) + np.log(1.1) * x_h1.sum(axis=1)
 
     z = np.random.binomial(1, p=(1/(1+np.exp(-logits))))
     X = np.stack((x1, x2, x3, x4, x5, x6), axis=1)
@@ -235,127 +236,127 @@ if __name__ == "__main__":
 
     """
     simulation sample number args.nsim:  1000000
-    HR 0.5781950897226341 ([0.57651537 0.57987971]) p:0.0
+    HR 0.5784870728502016 ([0.57680654 0.58017251]) p:0.0
     np.exp(-1) 0.36787944117144233
     """
-    zz
-
-    Tend = 200
-    print('Tend:', Tend)
-
-    Y = T <= Tend
-    T_censor = np.copy(T)
-    T_censor[T>Tend] = Tend
-
-    X1 = X[z==1]
-    X0 = X[z==0]
-    smd = smd_func(X1, np.ones((len(X1),1)), X0, np.ones((len(X0),1)), abs=True)
-    print('smd', smd)
-    # plot survival time
-    data_debug = pd.DataFrame(
-        data={'treatment': z, 't2e': T})
-    if os.name != 'posix':
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, stat="percent", common_norm=False)
-        sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
-        sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
-        # for ax in axes:
-        #     ax.set_xlim(-1, Tend+20)
-        plt.show()
-
-    # train_ratio = 0.8  # 0.5
-    train_ratio = args.train_ratio  # default 0.8
-    print('train_ratio: ', train_ratio,
-          'test_ratio: ', 1 - train_ratio)
-
-    my_dataset = X
-    dataset_size = len(my_dataset)
-    indices = list(range(dataset_size))
-    train_index = int(np.floor(train_ratio * dataset_size))
-    # val_index = int(np.floor(val_ratio * dataset_size))
-    np.random.shuffle(indices)
-
-    train_indices, test_indices = indices[:train_index], indices[train_index:]
-
-    # %% Logistic regression PS PSModels
-    if args.run_model in ['LR', 'XGBOOST', 'LIGHTGBM']:
-        print("**************************************************")
-        print(args.run_model, ' PS model learning:')
-
-        print('Train data:')
-        train_x, train_t, train_y = flatten_data_sim(X, z, Y, T_censor, train_indices, verbose=1)
-        # train_x, train_t, train_y = flatten_data(my_dataset, train_indices)
-        # print('Validation data:')
-        # val_x, val_t, val_y = flatten_data(my_dataset, val_indices)
-        print('Test data:')
-        test_x, test_t, test_y = flatten_data_sim(X, z, Y, T_censor, test_indices, verbose=1)
-        # test_x, test_t, test_y = flatten_data(my_dataset, test_indices)
-        print('All data:')
-        x, t, y = flatten_data_sim(X, z, Y, T_censor, indices, verbose=1) #flatten_data(my_dataset, indices)  # all the data
-
-        # put fixed parameters also into a list e.g. 'objective' : ['binary',]
-        if args.run_model == 'LR':
-            paras_grid = {
-                'penalty': ['l1', 'l2'],
-                'C': 10 ** np.arange(-3, 3, 0.5),
-                # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
-                'max_iter': [200],  # [100, 200, 500],
-                'random_state': [args.random_seed],
-            }
-            #
-            # paras_grid = {
-            #     'penalty': ['l1',],
-            #     'C': [1,],
-            #     # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
-            #     'max_iter': [200],  # [100, 200, 500],
-            #     'random_state': [args.random_seed],
-            # }
-        elif args.run_model == 'XGBOOST':
-            paras_grid = {
-                'max_depth': [3, 4],
-                'min_child_weight': np.linspace(0, 1, 5),
-                'learning_rate': np.arange(0.01, 1, 0.1),
-                'colsample_bytree': np.linspace(0.05, 1, 5),
-                'random_state': [args.random_seed],
-            }
-        elif args.run_model == 'LIGHTGBM':
-            paras_grid = {
-                'max_depth': [3, 4, 5],
-                'learning_rate': np.arange(0.01, 1, 0.25),
-                'num_leaves': np.arange(10, 120, 30),
-                'min_child_samples': [200, 250, 300],
-                'random_state': [args.random_seed],
-            }
-        else:
-            paras_grid = {}
-
-        # ----2. Learning IPW using PropensityEstimator
-        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
-        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
-        #                                                                         test_t)
-
-        HR_ori, CI_ori, cph_ori = cox_no_weight(t, y)
-        print('HR {} ({}) p:{}'.format(HR_ori, CI_ori, cph_ori.summary.p.treatment))
-        print('np.exp(-1)', np.exp(-1))
-
-        zzz
-
-        model = ml.PropensityEstimator(
-            args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit_withtestset_witheffect(
-            train_x, train_t, train_y, test_x, test_t, test_y, verbose=1)
-
-        # with open(args.save_model_filename, 'wb') as f:
-        #     pickle.dump(model, f)
-
-        model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
-        model.results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
-        # ----3. Evaluation learned PropensityEstimator
-        # results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
-        #                                                  test_x, test_t, test_y, x, t, y,
-        #                                                  drug_name, feature_name, n_feature, dump_ori=False)
-        results_all_list, results_all_df = final_eval_ml_CV_revise_traintest(
-            model, args, train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
-            {'simu':'simu', args.treated_drug:args.treated_drug}, np.array([str(i+1) for i in range(n_feature)]), n_feature, dump_ori=False)
+    # zz
+    #
+    # Tend = 200
+    # print('Tend:', Tend)
+    #
+    # Y = T <= Tend
+    # T_censor = np.copy(T)
+    # T_censor[T>Tend] = Tend
+    #
+    # X1 = X[z==1]
+    # X0 = X[z==0]
+    # smd = smd_func(X1, np.ones((len(X1),1)), X0, np.ones((len(X0),1)), abs=True)
+    # print('smd', smd)
+    # # plot survival time
+    # data_debug = pd.DataFrame(
+    #     data={'treatment': z, 't2e': T})
+    # if os.name != 'posix':
+    #     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    #     sns.histplot(ax=axes[0], data=data_debug, x='t2e', hue='treatment', kde=True, stat="percent", common_norm=False)
+    #     sns.ecdfplot(ax=axes[1], data=data_debug, x='t2e', hue='treatment', complementary=True)
+    #     sns.ecdfplot(ax=axes[2], data=data_debug, x='t2e', hue='treatment', complementary=False)
+    #     # for ax in axes:
+    #     #     ax.set_xlim(-1, Tend+20)
+    #     plt.show()
+    #
+    # # train_ratio = 0.8  # 0.5
+    # train_ratio = args.train_ratio  # default 0.8
+    # print('train_ratio: ', train_ratio,
+    #       'test_ratio: ', 1 - train_ratio)
+    #
+    # my_dataset = X
+    # dataset_size = len(my_dataset)
+    # indices = list(range(dataset_size))
+    # train_index = int(np.floor(train_ratio * dataset_size))
+    # # val_index = int(np.floor(val_ratio * dataset_size))
+    # np.random.shuffle(indices)
+    #
+    # train_indices, test_indices = indices[:train_index], indices[train_index:]
+    #
+    # # %% Logistic regression PS PSModels
+    # if args.run_model in ['LR', 'XGBOOST', 'LIGHTGBM']:
+    #     print("**************************************************")
+    #     print(args.run_model, ' PS model learning:')
+    #
+    #     print('Train data:')
+    #     train_x, train_t, train_y = flatten_data_sim(X, z, Y, T_censor, train_indices, verbose=1)
+    #     # train_x, train_t, train_y = flatten_data(my_dataset, train_indices)
+    #     # print('Validation data:')
+    #     # val_x, val_t, val_y = flatten_data(my_dataset, val_indices)
+    #     print('Test data:')
+    #     test_x, test_t, test_y = flatten_data_sim(X, z, Y, T_censor, test_indices, verbose=1)
+    #     # test_x, test_t, test_y = flatten_data(my_dataset, test_indices)
+    #     print('All data:')
+    #     x, t, y = flatten_data_sim(X, z, Y, T_censor, indices, verbose=1) #flatten_data(my_dataset, indices)  # all the data
+    #
+    #     # put fixed parameters also into a list e.g. 'objective' : ['binary',]
+    #     if args.run_model == 'LR':
+    #         paras_grid = {
+    #             'penalty': ['l1', 'l2'],
+    #             'C': 10 ** np.arange(-3, 3, 0.5),
+    #             # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+    #             'max_iter': [200],  # [100, 200, 500],
+    #             'random_state': [args.random_seed],
+    #         }
+    #         #
+    #         # paras_grid = {
+    #         #     'penalty': ['l1',],
+    #         #     'C': [1,],
+    #         #     # 0.2),  # 'C': [0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 20],
+    #         #     'max_iter': [200],  # [100, 200, 500],
+    #         #     'random_state': [args.random_seed],
+    #         # }
+    #     elif args.run_model == 'XGBOOST':
+    #         paras_grid = {
+    #             'max_depth': [3, 4],
+    #             'min_child_weight': np.linspace(0, 1, 5),
+    #             'learning_rate': np.arange(0.01, 1, 0.1),
+    #             'colsample_bytree': np.linspace(0.05, 1, 5),
+    #             'random_state': [args.random_seed],
+    #         }
+    #     elif args.run_model == 'LIGHTGBM':
+    #         paras_grid = {
+    #             'max_depth': [3, 4, 5],
+    #             'learning_rate': np.arange(0.01, 1, 0.25),
+    #             'num_leaves': np.arange(10, 120, 30),
+    #             'min_child_samples': [200, 250, 300],
+    #             'random_state': [args.random_seed],
+    #         }
+    #     else:
+    #         paras_grid = {}
+    #
+    #     # ----2. Learning IPW using PropensityEstimator
+    #     # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
+    #     # model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
+    #     #                                                                         test_t)
+    #
+    #     HR_ori, CI_ori, cph_ori = cox_no_weight(t, y)
+    #     print('HR {} ({}) p:{}'.format(HR_ori, CI_ori, cph_ori.summary.p.treatment))
+    #     print('np.exp(-1)', np.exp(-1))
+    #
+    #     zzz
+    #
+    #     model = ml.PropensityEstimator(
+    #         args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit_withtestset_witheffect(
+    #         train_x, train_t, train_y, test_x, test_t, test_y, verbose=1)
+    #
+    #     # with open(args.save_model_filename, 'wb') as f:
+    #     #     pickle.dump(model, f)
+    #
+    #     model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
+    #     model.results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
+    #     # ----3. Evaluation learned PropensityEstimator
+    #     # results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
+    #     #                                                  test_x, test_t, test_y, x, t, y,
+    #     #                                                  drug_name, feature_name, n_feature, dump_ori=False)
+    #     results_all_list, results_all_df = final_eval_ml_CV_revise_traintest(
+    #         model, args, train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
+    #         {'simu':'simu', args.treated_drug:args.treated_drug}, np.array([str(i+1) for i in range(n_feature)]), n_feature, dump_ori=False)
 
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
