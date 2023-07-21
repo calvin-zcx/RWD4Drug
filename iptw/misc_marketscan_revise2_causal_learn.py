@@ -2319,11 +2319,12 @@ if __name__ == '__main__':
 
     shell_for_ml_marketscan_5yrs_selectcovDAG(
         cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
-        more_para='--adjustP', folder='revise2_f5yrs_selectcovDAGAdjustP', appendix='-DAGAdjustP')
+        more_para='--adjustP --sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAGAdjustP', appendix='-DAGAdjustP')
+    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAGAdjustP_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=3, skip_first=1)
 
     shell_for_ml_marketscan_5yrs_selectcovDAG(
         cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
-        more_para='', folder='revise2_f5yrs_selectcovDAG', appendix='-DAG')
+        more_para='--sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAG', appendix='-DAG')
 
     zz
 

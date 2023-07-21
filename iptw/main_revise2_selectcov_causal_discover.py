@@ -98,6 +98,7 @@ def parse_args():
     # causal discovery part
     parser.add_argument('--noDAGLearn', action='store_true')
     parser.add_argument('--adjustP', action='store_true')
+    parser.add_argument('--sample_ratio', type=float, default=1.0)
     # Deep PSModels
     parser.add_argument('--batch_size', type=int, default=256)  #768)  # 64)
     parser.add_argument('--learning_rate', type=float, default=1e-3)  # 0.001
@@ -489,14 +490,20 @@ if __name__ == "__main__":
             yb = np.copy(y[:, 0])
             yb [yb<=0] = 0
             cdata = np.hstack([t.reshape(-1,1), yb.reshape(-1,1), x])
+            if (args.sample_ratio < 1) and (args.sample_ratio > 0):
+                print('Sampling rows for graph learning, ratio', args.sample_ratio, ', cdata.shape', cdata.shape)
+                _indices = np.random.choice(cdata.shape[0], int(cdata.shape[0] * args.sample_ratio), replace=False)
+                cdata = cdata[_indices]
+                print('After sample, cdata.shape', args.sample_ratio, cdata.shape)
+
             select_col_name = ['T', 'Y'] + _col_name
 
             priori = PrioriKnowledge(len(select_col_name))
             priori.add_required_edges([(0, 1), (2, 1), (3, 1), (2, 0), (3, 0)])
             priori.add_forbidden_edges([(1, 0), ]
-                                       + [(1, x) for x in range(2, len(select_col_name))]  # all x before Y
-                                       + [(x, 2) for x in range(0, len(select_col_name))]  # can not change sex
-                                       + [(x, 3) for x in range(0, len(select_col_name))]  # can not change age
+                                       + [(1, _c) for _c in range(2, len(select_col_name))]  # all x before Y
+                                       + [(_c, 2) for _c in range(0, len(select_col_name))]  # can not change sex
+                                       + [(_c, 3) for _c in range(0, len(select_col_name))]  # can not change age
                                        )
             if args.adjustP:
                 _alpha = 0.05/(len(select_col_name) * (len(select_col_name)-1)/2)
