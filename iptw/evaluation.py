@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from sklearn.metrics import roc_auc_score
 import torch.nn.functional as F
-from sklearn.manifold import TSNE
+# from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.special import softmax
