@@ -2491,7 +2491,7 @@ if __name__ == '__main__':
         print('Using rxnorm_cui vocabulary, len(drug_name) :', len(drug_name))
 
     # 2023-7-21 Revise 2---Step 1, , generate shell
-    drug_list = ['40790', '25480', '161', '83367', '435', '41126', '723', '7646']
+    drug_list = ['40790', '25480',  '83367', '435', '41126', '7646', '8640', '723', '161',]
     #
     shell_for_ml_selected_drugs_5yrs(
         drug_list, cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50,

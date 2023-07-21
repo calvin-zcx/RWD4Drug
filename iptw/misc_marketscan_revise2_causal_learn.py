@@ -2312,7 +2312,7 @@ if __name__ == '__main__':
 
 
     ## 2023-7-21 5 years followup, selected cov, causal learn
-    drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '01200010']
+    drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '22100045', '01200010']
     shell_for_ml_marketscan_5yrs_selectcovDAG(
         cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
         more_para='--noDAGLearn', folder='revise2_f5yrs_selectcovNoDAG', appendix='-noDAG')
@@ -2320,11 +2320,12 @@ if __name__ == '__main__':
     shell_for_ml_marketscan_5yrs_selectcovDAG(
         cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
         more_para='--adjustP --sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAGAdjustP', appendix='-DAGAdjustP')
-    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAGAdjustP_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=3, skip_first=1)
+    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAGAdjustP_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
 
     shell_for_ml_marketscan_5yrs_selectcovDAG(
         cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
         more_para='--sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAG', appendix='-DAG')
+    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAG_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
 
     zz
 
