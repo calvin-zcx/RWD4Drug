@@ -2311,102 +2311,31 @@ if __name__ == '__main__':
         print('Using GPI vocabulary, len(drug_name) :', len(drug_name))
 
 
-    ## 2023-7-21 5 years followup, selected cov, causal learn
-    drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '22100045', '01200010']
-    shell_for_ml_marketscan_5yrs_selectcovDAG(
-        cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
-        more_para='--noDAGLearn', folder='revise2_f5yrs_selectcovNoDAG', appendix='-noDAG')
-
-    shell_for_ml_marketscan_5yrs_selectcovDAG(
-        cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
-        more_para='--adjustP --sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAGAdjustP', appendix='-DAGAdjustP')
-    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAGAdjustP_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
-
-    shell_for_ml_marketscan_5yrs_selectcovDAG(
-        cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
-        more_para='--sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAG', appendix='-DAG')
-    split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAG_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
-
-    zz
-
-    ## 2022-12-26
-    # shell_for_ml_marketscan(cohort_dir_name='save_cohort_all_loose', model='LR', niter=50,
-    #                         stats=False)  # too slow to get --stats
-    # split_shell_file("revise_shell_LR_save_cohort_all_loose_marketscan-01.sh", divide=6, skip_first=1)
-    # sys.exit(0)
-
-    ## primary and sensitivity analysis
-    # cohort_dir_name = 'save_cohort_all_loose'
-    # model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # # results_model_selection_for_ml(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name, niter=50, figdump=False)
-    # # results_model_selection_for_ml_step2(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
+    # ## 2023-7-21 5 years followup, selected cov, causal learn
+    # drug_id_gpi = ['49270070', '72600030', '39400010', '44201010', '42200032', '49270060', '22100045', '01200010']
+    # shell_for_ml_marketscan_5yrs_selectcovDAG(
+    #     cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
+    #     more_para='--noDAGLearn', folder='revise2_f5yrs_selectcovNoDAG', appendix='-noDAG')
     #
-    # exp_dir = r'output_marketscan/revise'  # main analysis
-    # # exp_dir = r'output_marketscan/revise_selectcov'  # sensitivity analysis
-    # results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model=model, niter=50)
-    # results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
-    # results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model)
+    # shell_for_ml_marketscan_5yrs_selectcovDAG(
+    #     cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
+    #     more_para='--adjustP --sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAGAdjustP', appendix='-DAGAdjustP')
+    # split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAGAdjustP_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
+    #
+    # shell_for_ml_marketscan_5yrs_selectcovDAG(
+    #     cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50, stats=False, selected=drug_id_gpi,
+    #     more_para='--sample_ratio 0.5', folder='revise2_f5yrs_selectcovDAG', appendix='-DAG')
+    # split_shell_file("revise2_marketscan_f5yrs_selecteCov-DAG_shell_LR_save_cohort_all_loose_f5yrs_selected.sh", divide=2, skip_first=1)
 
-    # 2023-1-12, 5 yrs followup sensitivity
+    # 2023-7-23, Revise 2- Step 2, SelectCOV + DAG + 5 yrs followup sensitivity
     cohort_dir_name = 'save_cohort_all_loose_f5yrs'
     model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    exp_dir = r'output_marketscan/revise_f5yrs'  # main analysis
+    exp_dir = r'output_marketscan/revise2_f5yrs_selectcovDAGAdjustP'
+    exp_dir = r'output_marketscan/revise2_f5yrs_selectcovNoDAG'
+    exp_dir = r'output_marketscan/revise2_f5yrs_selectcovDAG'
+
     results_ATE_for_ml(exp_dir, cohort_dir_name=cohort_dir_name, model=model, niter=50)
     results_ATE_for_ml_step2(exp_dir, cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     results_ATE_for_ml_step3_finalInfo(exp_dir, cohort_dir_name, model)
-
-    zz
-    # combine_ate_final_LR_with(cohort_dir_name, 'LSTM') # needs to compute lstm case first
-    #
-    # major plots from 3 methods
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # #
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # box_plot_ate(cohort_dir_name, model=model, model2='LR', contrl_type='all')
-
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-                                                   datapart='all')
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-                                                   datapart='train')
-    arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',
-                                                   datapart='test')
-
-    zz
-    sys.exit(0)
-    #
-    # # # ## all methods plots in appendix
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-    # #
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # box_plot_model_selectionV2(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all')
-
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
-
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='all')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='all')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='all')
-    #
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='atc')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='atc')
-    #
-    # box_plot_ate(cohort_dir_name, model=model, model2='MLP', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LIGHTGBM', contrl_type='random')
-    # box_plot_ate(cohort_dir_name, model=model, model2='LSTM', contrl_type='random')
-
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='random')
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='atc')
-    # box_plot_ate_V2(cohort_dir_name, models=['LR', 'LSTM', 'MLP', 'LIGHTGBM'], contrl_type='all')
 
     print('Done')
