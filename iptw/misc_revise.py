@@ -334,6 +334,51 @@ def shell_for_ml_selected_drugs_5yrs(drug_list, cohort_dir_name, model, niter=50
     print('In total ', n, ' commands')
 
 
+def shell_for_ml_all_drugs_5yrs(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
+    cohort_size = pickle.load(open(r'../ipreprocess/output/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
+    fo = open('revise2_f5yrs_all_shell_{}_{}.sh'.format(model, cohort_dir_name), 'w')  # 'a'
+    name_cnt = sorted(cohort_size.items(), key=lambda x: x[1], reverse=True)
+
+    # load others:
+    df = pd.read_excel(r'../data/repurposed_AD_under_trials_20200227.xlsx', dtype=str)
+    added_drug = [] + ['6809', '135447'] # metformin, donepezil
+
+    for index, row in df.iterrows():
+        rx = row['rxcui']
+        gpi = row['gpi']
+        if pd.notna(rx):
+            rx = [x + '.pkl' for x in re.split('[,;+]', rx)]
+            added_drug.extend(rx)
+
+        if pd.notna(gpi):
+            gpi = [x + '.pkl' for x in re.split('[,;+]', gpi)]
+            added_drug.extend(gpi)
+
+    print('len(added_drug): ', len(added_drug))
+    print(added_drug)
+
+    fo.write('mkdir -p output/revise2_f5yrs_all/{}/{}/log\n'.format(cohort_dir_name, model))
+    n = 0
+    for x in name_cnt:
+        k, v = x
+        if (v >= min_patients) or (k in added_drug):
+            drug = k.split('.')[0]
+            for ctrl_type in ['random', 'atc']:
+                for seed in range(0, niter):
+                    cmd = "python main_revise.py --data_dir ../ipreprocess/output/{}/ --treated_drug {} " \
+                          "--controlled_drug {} --run_model {} --output_dir output/revise2_f5yrs_all/{}/{}/ --random_seed {} " \
+                          "--drug_coding rxnorm --med_code_topk 200 {} {} " \
+                          "2>&1 | tee output/revise2_f5yrs_all/{}/{}/log/{}_S{}D200C{}_{}.log\n".format(
+                        cohort_dir_name, drug,
+                        ctrl_type, model, cohort_dir_name, model, seed, '--stats' if stats else '', more_para,
+                        cohort_dir_name, model, drug, seed, ctrl_type, model)
+                    fo.write(cmd)
+                    n += 1
+
+    fo.close()
+    print('In total ', n, ' commands')
+
+
 def shell_for_ml_marketscan(cohort_dir_name, model, niter=50, min_patients=500, stats=True, more_para=''):
     cohort_size = pickle.load(
         open(r'../ipreprocess/output_marketscan/{}/cohorts_size.pkl'.format(cohort_dir_name), 'rb'))
@@ -2703,6 +2748,12 @@ if __name__ == '__main__':
     #
     # sys.exit(0)
 
+    # 2023-8-2
+    shell_for_ml_all_drugs_5yrs(cohort_dir_name='save_cohort_all_loose_f5yrs', model='LR', niter=50)
+    split_shell_file('revise2_f5yrs_all_shell_LR_save_cohort_all_loose_f5yrs.sh', divide=2, skip_first=1)
+
+
+    zz
     ## primary and sensitivity analysis
     # cohort_dir_name = 'save_cohort_all_loose'
     # model = 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
