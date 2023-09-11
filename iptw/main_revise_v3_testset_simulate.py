@@ -6,15 +6,15 @@ from numpy import ndarray
 sys.path.insert(0, '..')
 import os
 
-if os.name == 'posix':
-    try:
-        from sklearnex import patch_sklearn
-
-        patch_sklearn(["LogisticRegression"])
-        print('using sklearnex')
-    except ModuleNotFoundError as err:
-        # Error handling
-        print(err)
+# if os.name == 'posix':
+#     try:
+#         from sklearnex import patch_sklearn
+#
+#         patch_sklearn(["LogisticRegression"])
+#         print('using sklearnex')
+#     except ModuleNotFoundError as err:
+#         # Error handling
+#         print(err)
 
 import time
 # from dataset import *
