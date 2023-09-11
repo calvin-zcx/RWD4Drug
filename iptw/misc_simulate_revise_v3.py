@@ -1459,7 +1459,7 @@ def aHR_evaluation_table(model, groundtruth, contrl_type='all', dump=True, color
 if __name__ == '__main__':
     # 2023-9-11
     shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
-    split_shell_file("simulate_v3_shell_LR.sh", divide=5, skip_first=1)
+    split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
     sys.exit(0)
 
     # 2023-7-6
