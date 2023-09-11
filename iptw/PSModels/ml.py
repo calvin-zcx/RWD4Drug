@@ -40,7 +40,7 @@ class PropensityEstimator:
             self.paras_names = paras_names
             self.paras_list = [{self.paras_names[i]: para[i] for i in range(len(para))} for para in paras_list]
             if self.learner == 'LR':
-                no_penalty_case = {'penalty': 'None', 'max_iter': 200, 'random_state': random_seed}
+                no_penalty_case = {'penalty': 'none', 'max_iter': 200, 'random_state': random_seed}
                 if (no_penalty_case not in self.paras_list) and (len(self.paras_list) > 1):
                     # self.paras_list.append(no_penalty_case)
                     self.paras_list = [no_penalty_case, ] + self.paras_list  # debug
