@@ -213,6 +213,8 @@ if __name__ == "__main__":
         logits_wo_bias = (
                 np.log(2) * x2 + np.log(3) * x3 + np.log(2) * x5 + np.log(2) * x6 + np.log(1.5) * x_h1.sum(axis=1)
                 + np.log(1.1) * x_h2.sum(axis=1))
+        bias = -6.84
+
         if args.covspecs == 'incorrect':
             X = np.stack((x1 ** 2, x2 ** 2, x3 ** 2, x4, x5, x6), axis=1)
             X = np.concatenate((X, x_h1, x_h2), axis=1)
@@ -228,8 +230,13 @@ if __name__ == "__main__":
     elif args.nonlin == 'moderate':
         # used in manuscript as nolinear generative model
         print('Moderate nolinear effect!')
-        logits_wo_bias = (x1 * (np.log(2) * x2 ** 2 + np.log(3) * x3 * x2 + np.log(2) * x5 + np.log(2) * x6 + np.log(
-            1.5) * x_h1.sum(axis=1)) + np.log(1.1) * x_h2.sum(axis=1))
+        logits_wo_bias = (x1 *
+                          (np.log(2) * x2 ** 2 + np.log(3) * x3 * x2 + np.log(2) * x5 + np.log(2) * x6 + np.log(1.5) *
+                           x_h1.sum(axis=1)
+                           ) +
+                          np.log(1.1) * x_h2.sum(axis=1))
+        bias = -5.72
+
         if args.covspecs == 'incorrect':
             X = np.stack((x1, x2, x3, x4, x5, x6), axis=1)
             X = np.concatenate((X, x_h1, x_h2), axis=1)
@@ -243,7 +250,7 @@ if __name__ == "__main__":
             raise ValueError
     elif args.nonlin == 'strong':
         # Not used in manuscript
-        print('Strong nolinear effect!')
+        print('Strong nolinear effect! (discarded!)')
         logits_wo_bias = x1 * (np.log(2) * x2 ** 2 + np.log(3) * x3 * x2 + np.log(2) * x5 + np.log(2) * x6 +
                                np.log(1.5) * x_h1.sum(axis=1) + np.log(1.1) * x_h2.sum(axis=1))
         if args.covspecs == 'incorrect':
@@ -260,12 +267,12 @@ if __name__ == "__main__":
     else:
         raise ValueError
 
-    target_logits_mean = -0.15  # -0.013648586697455571
-    bias = target_logits_mean - logits_wo_bias.mean()
-    logits = bias + logits_wo_bias
+    # target_logits_mean = -0.15  # -0.013648586697455571
+    # bias = target_logits_mean - logits_wo_bias.mean()
+    # print('target_logits_mean:', target_logits_mean, )
 
-    print('target_logits_mean:', target_logits_mean, 'logits.mean()', logits.mean(),
-          '\nbias:', bias, 'logits_wo_bias.mean():', logits_wo_bias.mean(), )
+    logits = bias + logits_wo_bias
+    print('logits.mean()', logits.mean(), '\nbias:', bias, 'logits_wo_bias.mean():', logits_wo_bias.mean(), )
 
     z = np.random.binomial(1, p=(1 / (1 + np.exp(-logits))))
 
@@ -275,10 +282,10 @@ if __name__ == "__main__":
     r = 1.8
     a = 2
     cof = np.log(r) * x1 + np.log(r) * x2 + np.log(r) * x4 + np.log(2.3) * x5 ** 2 + np.log(1.5) * x_h1.sum(
-        axis=1) + np.log(1.1) * x_h2.sum(axis=1) - 5.673 - 1. * z
+        axis=1) + np.log(1.1) * x_h2.sum(axis=1) - 5.67 - 1. * z
     T = (-np.log(np.random.uniform(0, 1, n)) / np.exp(cof)) ** (1 / a) * 100
 
-    Tend = 200  # np.inf #200
+    Tend = 200  # np.inf
     print('Tend:', Tend)
 
     Y = T <= Tend
@@ -386,10 +393,6 @@ if __name__ == "__main__":
             paras_grid = {}
 
         # ----2. Learning IPW using PropensityEstimator
-        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit(train_x, train_t, val_x, val_t)
-        # model = ml.PropensityEstimator(args.run_model, paras_grid).fit_and_test(train_x, train_t, val_x, val_t, test_x,
-        #                                                                         test_t)
-
         model = ml.PropensityEstimator(
             args.run_model, paras_grid, random_seed=args.random_seed).cross_validation_fit_withtestset_witheffect(
             train_x, train_t, train_y, test_x, test_t, test_y, verbose=1)
@@ -400,9 +403,7 @@ if __name__ == "__main__":
         model.results.to_csv(args.save_model_filename + '_ALL-model-select.csv')
         model.results_agg.to_csv(args.save_model_filename + '_ALL-model-select-agg.csv')
         # ----3. Evaluation learned PropensityEstimator
-        # results_all_list, results_all_df = final_eval_ml(model, args, train_x, train_t, train_y, val_x, val_t, val_y,
-        #                                                  test_x, test_t, test_y, x, t, y,
-        #                                                  drug_name, feature_name, n_feature, dump_ori=False)
+
         results_all_list, results_all_df = final_eval_ml_CV_revise_traintest(
             model, args, train_x, train_t, train_y, test_x, test_t, test_y, x, t, y,
             {'simu': 'simu', args.treated_drug: args.treated_drug}, np.array([str(i + 1) for i in range(n_feature)]),
@@ -410,16 +411,4 @@ if __name__ == "__main__":
 
     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
 
-# if __name__ == "__main__":
-#     start_time = time.time()
-#     main(args=parse_args())
-#     print('Done! Total Time used:', time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)))
-# from line_profiler import LineProfiler
-#
-# lprofiler = LineProfiler()
-# lprofiler.add_function(build_patient_characteristics_from_triples)
-# lprofiler.add_function(statistics_for_treated_control)
-# lp_wrapper = lprofiler(main_func)
-#
-# lp_wrapper()
-# lprofiler.print_stats()
+

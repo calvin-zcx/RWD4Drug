@@ -151,8 +151,8 @@ def shell_for_ml_simulation(model, niter=10, start=0, more_para=''):
     fo.write('mkdir -p output/simulate_v3/{}/log\n'.format(model))
     r = 0
     for n in [3000, 3500, 4000, 4500, 5000]:  # [2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000]: #[2000, 4000, 6000]:
-        for nolinear in ['no', 'moderate', 'strong']:
-            for covspec in ['correct', 'partial', 'incorrect']:
+        for nolinear in ['no', 'moderate']:  # , 'strong'
+            for covspec in ['correct',  'incorrect']:  # 'partial',
                 for train_ratio in [0.8]:  # , 0.6
                     drug = '{}{}{}tr{:.1f}'.format(n, nolinear, covspec, train_ratio)
                     for seed in range(start, niter):
@@ -1487,9 +1487,10 @@ def aHR_evaluation_table(model, groundtruth_dict, contrl_type='all', dump=True, 
 
 if __name__ == '__main__':
     # # 2023-9-11
-    # shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
-    # split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
-    # sys.exit(0)
+    # # 2023-9-19
+    shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
+    split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
+    sys.exit(0)
     #
     # # 2023-7-6
     # # shell_for_ml_simulation('LR', niter=50, start=0, more_para='')  #
