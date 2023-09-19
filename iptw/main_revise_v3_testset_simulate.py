@@ -208,6 +208,7 @@ if __name__ == "__main__":
     x_h2 = np.random.binomial(1, p=0.2, size=(n, h - h1))
 
     if args.nonlin == 'no':
+        # used in manuscript as linear generative model
         print('No nolinear effect!')
         logits_wo_bias = (
                 np.log(2) * x2 + np.log(3) * x3 + np.log(2) * x5 + np.log(2) * x6 + np.log(1.5) * x_h1.sum(axis=1)
@@ -225,6 +226,7 @@ if __name__ == "__main__":
             raise ValueError
 
     elif args.nonlin == 'moderate':
+        # used in manuscript as nolinear generative model
         print('Moderate nolinear effect!')
         logits_wo_bias = (x1 * (np.log(2) * x2 ** 2 + np.log(3) * x3 * x2 + np.log(2) * x5 + np.log(2) * x6 + np.log(
             1.5) * x_h1.sum(axis=1)) + np.log(1.1) * x_h2.sum(axis=1))
@@ -240,6 +242,7 @@ if __name__ == "__main__":
         else:
             raise ValueError
     elif args.nonlin == 'strong':
+        # Not used in manuscript
         print('Strong nolinear effect!')
         logits_wo_bias = x1 * (np.log(2) * x2 ** 2 + np.log(3) * x3 * x2 + np.log(2) * x5 + np.log(2) * x6 +
                                np.log(1.5) * x_h1.sum(axis=1) + np.log(1.1) * x_h2.sum(axis=1))

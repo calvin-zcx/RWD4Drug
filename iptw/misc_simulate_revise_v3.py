@@ -28,7 +28,7 @@ from sklearn.metrics import mean_squared_error
 
 print = functools.partial(print, flush=True)
 
-MAX_NO_UNBALANCED_FEATURE = 5  # 2  #5 #5  # 0 # 10 #5
+MAX_NO_UNBALANCED_FEATURE = 2  # 5  # 2  #5 #5  # 0 # 10 #5
 # 5
 print('Global MAX_NO_UNBALANCED_FEATURE: ', MAX_NO_UNBALANCED_FEATURE)
 
@@ -199,8 +199,10 @@ def _simplify_col_(x):
 
 
 def results_model_selection_for_ml(model, niter=10):
-    dirname = r'output/simulate_v2/{}/'.format(model)
-    drug_list = sorted([x for x in os.listdir(dirname) if x.startswith('simun') and 'partial' not in x], reverse=True)
+    dirname = r'output/simulate_v3/{}/'.format(model)
+    drug_list = sorted(
+        [x for x in os.listdir(dirname) if x.startswith('simun') and (('partial' not in x) and ('strong' not in x))],
+        reverse=True)
     check_and_mkdir(dirname + 'results/')
 
     for drug in drug_list:
@@ -333,8 +335,10 @@ def results_model_selection_for_ml(model, niter=10):
 
 
 def results_model_selection_for_ml_step2(model):
-    dirname = r'output/simulate_v2/{}/'.format(model)
-    drug_list = sorted([x for x in os.listdir(dirname) if x.startswith('simun') and 'partial' not in x], reverse=True)
+    dirname = r'output/simulate_v3/{}/'.format(model)
+    drug_list = sorted(
+        [x for x in os.listdir(dirname) if x.startswith('simun') and (('partial' not in x) and ('strong' not in x))],
+        reverse=True)
     check_and_mkdir(dirname + 'results/')
 
     writer = pd.ExcelWriter(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), engine='xlsxwriter')
@@ -506,7 +510,7 @@ def results_model_selection_for_ml_step2More(cohort_dir_name, model, drug_name):
 
 
 def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True):
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model), sheet_name=contrl_type)
 
     c1 = 'success_rate-val_auc-i-all_n_unbalanced_feat_iptw'
@@ -552,7 +556,9 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
     paucsmd = np.array(df.loc[:, "p-succes-1-vs-2"])
 
     xlabels = df.loc[:, 'drug_name']
-    xlabels = [x[5:] for x in xlabels]
+    # xlabels = [x[5:] for x in xlabels] # drugname.replace('simun', '').replace('train0.8', ''), #
+    xlabels = [x.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace('moderate', '-nonLin-') for
+               x in xlabels]
 
     width = 0.45  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
@@ -665,7 +671,7 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
 def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dump=True,
                                                    colorful=True, datapart='all', log=False):
     # dataset: train, test, all
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -726,7 +732,9 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
             change_mean = change.mean()
             change_mean_ci, change_mean_std = bootstrap_mean_ci(change, alpha=0.05)
 
-            data[ith].append([drugname[5:], before_mean, after_mean, change_mean])
+            data[ith].append([drugname.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace(
+                'moderate', '-nonLin-'),  # drugname[5:],
+                              before_mean, after_mean, change_mean])
 
     data_df = []
     for d in data:
@@ -799,8 +807,10 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
     #
 
     if datapart == 'all':
-        ax.set_xlim(right=36)  # set x axis limits
+        ax.set_xlim(right=20)  # set x axis limits
         # plt.xlim(right=35)
+    elif datapart == 'train':
+        ax.set_xlim(right=25)
 
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
@@ -820,10 +830,10 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
     plt.clf()
 
 
-def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='all', dump=True,
+def arrow_plot_model_selection_bias_reduction(model, groundtruth_dict, contrl_type='all', dump=True,
                                               colorful=True, datapart='all', log=False, ):
     # dataset: train, test, all
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -848,19 +858,10 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
 
     df = dfall
 
-    # df = dfall.sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
-
-    # df['nsmd_mean_ci-val_auc_nsmd']
-
     N = len(df)
     drug_list = df.loc[idx, 'drug']
     drug_name_list = df.loc[idx, 'drug_name']
 
-    # df.loc[idx, :].to_csv(dirname + 'results/selected_balanced_drugs_for_screen.csv')
-    # data_1 = []
-    # data_2 = []
-    # data_3 = []
-    # data_pvalue = []
     data = [[], [], []]
     for drug, drugname in zip(drug_list, drug_name_list):
         rdf = pd.read_csv(dirname + 'results/' + drug + '_model_selection.csv')
@@ -868,6 +869,13 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
             idx = rdf['ctrl_type'] == contrl_type
         else:
             idx = rdf['ctrl_type'].notna()
+
+        if 'no' in drugname:
+            groundtruth = groundtruth_dict['no']
+        elif 'moderate' in drugname:
+            groundtruth = groundtruth_dict['moderate']
+        else:
+            raise ValueError
 
         for ith, c in enumerate([c1, c2, c3]):
             before = np.abs(groundtruth - np.array(rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)]))
@@ -886,7 +894,9 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
             change_mean = change.mean()
             change_mean_ci, change_mean_std = bootstrap_mean_ci(change, alpha=0.05)
 
-            data[ith].append([drugname[5:], before_mean, after_mean, change_mean])
+            data[ith].append([drugname.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace(
+                'moderate', '-nonLin-'),  # drugname[5:],
+                              before_mean, after_mean, change_mean])
 
     data_df = []
     for d in data:
@@ -953,7 +963,7 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
     # else:
     # ax.set_xlim(0.2, 1.1)  # set x axis limits
     # ax.axvline(x=groundtruth, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
-    ax.set_xlim(0, 0.25)
+    ax.set_xlim(0, 0.3)
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
@@ -972,10 +982,10 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth, contrl_type='a
     plt.clf()
 
 
-def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='all', dump=True,
+def arrow_plot_model_selection_mse_reduction(model, groundtruth_dict, contrl_type='all', dump=True,
                                              colorful=True, datapart='all', log=False, ):
     # dataset: train, test, all
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -1000,19 +1010,10 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
 
     df = dfall
 
-    # df = dfall.sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
-
-    # df['nsmd_mean_ci-val_auc_nsmd']
-
     N = len(df)
     drug_list = df.loc[idx, 'drug']
     drug_name_list = df.loc[idx, 'drug_name']
 
-    # df.loc[idx, :].to_csv(dirname + 'results/selected_balanced_drugs_for_screen.csv')
-    # data_1 = []
-    # data_2 = []
-    # data_3 = []
-    # data_pvalue = []
     data = [[], [], []]
     for drug, drugname in zip(drug_list, drug_name_list):
         rdf = pd.read_csv(dirname + 'results/' + drug + '_model_selection.csv')
@@ -1021,6 +1022,13 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
         else:
             idx = rdf['ctrl_type'].notna()
 
+        if 'no' in drugname:
+            groundtruth = groundtruth_dict['no']
+        elif 'moderate' in drugname:
+            groundtruth = groundtruth_dict['moderate']
+        else:
+            raise ValueError
+
         for ith, c in enumerate([c1, c2, c3]):
             mse_ori = mean_squared_error(np.ones_like(idx) * groundtruth, np.array(
                 rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)]))  # mean_squared_error(y_true, y_pred)
@@ -1028,7 +1036,9 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
                 rdf.loc[idx, c + '-{}_HR_IPTW'.format(datapart)]))  # mean_squared_error(y_true, y_pred)
             change = mse_iptw - mse_ori
 
-            data[ith].append([drugname[5:], mse_ori, mse_iptw, change])
+            data[ith].append([drugname.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace(
+                'moderate', '-nonLin-'),  # drugname[5:],
+                              mse_ori, mse_iptw, change])
 
     data_df = []
     for d in data:
@@ -1071,8 +1081,8 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
                      arrow_lengths[i],  # change in x
                      0,  # change in y
                      head_width=0.1,  # arrow head width
-                     head_length=0.02,  # arrow head length
-                     width=0.02,  # arrow stem width
+                     head_length=0.002,  # arrow head length
+                     width=0.001,  # arrow stem width
                      fc=colors[igroup],  # arrow fill color
                      ec=colors[igroup]
                      )  # arrow edge color
@@ -1095,7 +1105,7 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
     # else:
     # ax.set_xlim(0.2, 1.1)  # set x axis limits
     # ax.axvline(x=groundtruth, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
-    ax.set_xlim(0, 0.06)
+    ax.set_xlim(-0.01, 0.08)
     ax.axvline(x=0, color='0.9', ls='--', lw=2, zorder=0)  # add line at x=0
 
     if log:
@@ -1112,11 +1122,12 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth, contrl_type='al
                                                                                    '-log' if log else ''))
     plt.show()
     plt.clf()
+    return data_df
 
 
-def bar_plot_ahr_coverage(model, groundtruth, contrl_type='all', dump=True, datapart='all', log=False, ):
+def bar_plot_ahr_coverage(model, groundtruth_dict, contrl_type='all', dump=True, datapart='all', log=False, ):
     # dataset: train, test, all
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -1157,6 +1168,13 @@ def bar_plot_ahr_coverage(model, groundtruth, contrl_type='all', dump=True, data
             idx = rdf['ctrl_type'] == contrl_type
         else:
             idx = rdf['ctrl_type'].notna()  # always use this
+
+        if 'no' in drugname:
+            groundtruth = groundtruth_dict['no']
+        elif 'moderate' in drugname:
+            groundtruth = groundtruth_dict['moderate']
+        else:
+            raise ValueError
 
         for ith, c in enumerate([c1, c2, c3]):
             before = np.abs(groundtruth - np.array(rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)]))
@@ -1201,7 +1219,8 @@ def bar_plot_ahr_coverage(model, groundtruth, contrl_type='all', dump=True, data
             #                   before_std, after_std, change_std,
             #                   mse_ori, mse_iptw,
             #                   ahr_mean_iptw, ahr_var_iptw, coverage_n, coverage_mean])
-            data[ith].append([drugname[5:],
+            data[ith].append([drugname.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace(
+                'moderate', '-nonLin-'),  # drugname[5:],
                               ahr_mean_iptw, ahr_var_iptw,
                               after_mean, mse_iptw, coverage_mean])
 
@@ -1336,6 +1355,8 @@ def bar_plot_ahr_coverage(model, groundtruth, contrl_type='all', dump=True, data
 
     # ax.autoscale(enable=True, axis='x', tight=True)
     ax.set_xmargin(0.01)
+    ax.set_ylim(0, 1)
+
     plt.tight_layout()
     if dump:
         check_and_mkdir(dirname + 'results/fig/')
@@ -1345,9 +1366,9 @@ def bar_plot_ahr_coverage(model, groundtruth, contrl_type='all', dump=True, data
     plt.clf()
 
 
-def aHR_evaluation_table(model, groundtruth, contrl_type='all', dump=True, colorful=True, datapart='all', log=False, ):
+def aHR_evaluation_table(model, groundtruth_dict, contrl_type='all', dump=True, colorful=True, datapart='all', log=False, ):
     # dataset: train, test, all
-    dirname = r'output/simulate_v2/{}/'.format(model)
+    dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
     c1 = 'val_auc-i'
@@ -1388,6 +1409,13 @@ def aHR_evaluation_table(model, groundtruth, contrl_type='all', dump=True, color
             idx = rdf['ctrl_type'] == contrl_type
         else:
             idx = rdf['ctrl_type'].notna()  # always use this
+
+        if 'no' in drugname:
+            groundtruth = groundtruth_dict['no']
+        elif 'moderate' in drugname:
+            groundtruth = groundtruth_dict['moderate']
+        else:
+            raise ValueError
 
         for ith, c in enumerate([c1, c2, c3]):
             before = np.abs(groundtruth - np.array(rdf.loc[idx, c + '-{}_HR_ori'.format(datapart)]))
@@ -1432,7 +1460,8 @@ def aHR_evaluation_table(model, groundtruth, contrl_type='all', dump=True, color
             #                   before_std, after_std, change_std,
             #                   mse_ori, mse_iptw,
             #                   ahr_mean_iptw, ahr_var_iptw, coverage_n, coverage_mean])
-            data[ith].append([drugname[4:],
+            data[ith].append([drugname.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace(
+                'moderate', '-nonLin-'),  # drugname[4:],
                               ahr_mean_iptw, ahr_var_iptw,
                               after_mean, mse_iptw, coverage_mean])
 
@@ -1457,48 +1486,50 @@ def aHR_evaluation_table(model, groundtruth, contrl_type='all', dump=True, color
 
 
 if __name__ == '__main__':
-    # 2023-9-11
-    shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
-    split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
-    sys.exit(0)
-
-    # 2023-7-6
-    # shell_for_ml_simulation('LR', niter=50, start=0, more_para='')  #
-    # split_shell_file("simulate_v2_shell_LR.sh", divide=4, skip_first=1)
+    # # 2023-9-11
+    # shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
+    # split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
+    # sys.exit(0)
     #
-    # # shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
-    # # split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=5, skip_first=1)
-    # # sys.exit(0)
-    # zz
+    # # 2023-7-6
+    # # shell_for_ml_simulation('LR', niter=50, start=0, more_para='')  #
+    # # split_shell_file("simulate_v2_shell_LR.sh", divide=4, skip_first=1)
+    # #
+    # # # shell_for_ml_simulation('LIGHTGBM', niter=100, start=0, more_para='') #
+    # # # split_shell_file("simulate_shell_LIGHTGBM-server2.sh", divide=5, skip_first=1)
+    # # # sys.exit(0)
+    # # zz
 
     # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=50) #100
+    # results_model_selection_for_ml(model=model, niter=100) #100
     # results_model_selection_for_ml_step2(model=model)
     # # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     #
     # # major plots from 3 methods
     # # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    # bar_plot_model_selection(model=model, contrl_type='all')
+    bar_plot_model_selection(model=model, contrl_type='all')
     #
-    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
-    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
-    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
+    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
+    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
+    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
     #
     # # simulation sample number args.nsim:  1000000
     #
-    # groundtruth = 0.5784870728502016 # 0.5781950897226341
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='all')
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='train')
-    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth=groundtruth, datapart='test')
-    #
-    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth=groundtruth, datapart='all')
-    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth=groundtruth, datapart='train')
-    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth=groundtruth, datapart='test')
-    #
-    groundtruth = 0.5784870728502016  # 0.5781950897226341
-    # data_df = aHR_evaluation_table(model=model, groundtruth=groundtruth, datapart='all')
+    ##groundtruth = 0.578  #4870728502016 # 0.5781950897226341
+    groundtruth = {'no': 0.5781315363886127, 'moderate': 0.5787255780477224}
 
-    bar_plot_ahr_coverage(model=model, groundtruth=groundtruth, datapart='all')
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
+    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
+
+    data_df = arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
+    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
+    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
+    #
+    # groundtruth = {'no': 0.5781315363886127, 'moderate': 0.5787255780477224}
+    data_df = aHR_evaluation_table(model=model, groundtruth_dict=groundtruth, datapart='all')
+    bar_plot_ahr_coverage(model=model, groundtruth_dict=groundtruth, datapart='all')
+
     print('Done')
