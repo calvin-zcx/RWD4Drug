@@ -131,7 +131,7 @@ class PropensityEstimator:
             )
 
             self.results.append((i, para_d) + result_train + result_val + result_trainval)
-
+            # might use [0] loss in the future
             if (result_trainval[5] < self.best_balance) or \
                     ((result_trainval[5] == self.best_balance) and (result_val[1] > self.best_val)):
                 self.best_model = model

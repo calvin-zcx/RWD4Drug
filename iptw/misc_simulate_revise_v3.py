@@ -836,6 +836,7 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth_dict, contrl_ty
     dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
+    # for print only
     c1 = 'val_auc-i'
     c2 = 'val_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
@@ -853,6 +854,8 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth_dict, contrl_ty
     print(r"#df[{}] > 0: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
           '({:.2f}%)'.format(idx.mean() * 100))
 
+
+    # use all to compare
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'].notna()
     df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
 
