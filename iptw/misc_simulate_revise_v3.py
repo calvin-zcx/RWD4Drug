@@ -1488,9 +1488,9 @@ def aHR_evaluation_table(model, groundtruth_dict, contrl_type='all', dump=True, 
 if __name__ == '__main__':
     # # 2023-9-11
     # # 2023-9-19
-    shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
-    split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
-    sys.exit(0)
+    # shell_for_ml_simulation('LR', niter=100, start=0, more_para='')  #
+    # split_shell_file("simulate_v3_shell_LR.sh", divide=8, skip_first=1)
+    # sys.exit(0)
     #
     # # 2023-7-6
     # # shell_for_ml_simulation('LR', niter=50, start=0, more_para='')  #
@@ -1503,8 +1503,8 @@ if __name__ == '__main__':
 
     # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    # results_model_selection_for_ml(model=model, niter=100) #100
-    # results_model_selection_for_ml_step2(model=model)
+    results_model_selection_for_ml(model=model, niter=100) #100
+    results_model_selection_for_ml_step2(model=model)
     # # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     #
     # # major plots from 3 methods
@@ -1519,7 +1519,7 @@ if __name__ == '__main__':
     # # simulation sample number args.nsim:  1000000
     #
     ##groundtruth = 0.578  #4870728502016 # 0.5781950897226341
-    groundtruth = {'no': 0.5781315363886127, 'moderate': 0.5787255780477224}
+    groundtruth = {'no': 0.5780982066480141, 'moderate': 0.5780913629899157}
 
     arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
     arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
@@ -1529,7 +1529,7 @@ if __name__ == '__main__':
     arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
     arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
     #
-    # groundtruth = {'no': 0.5781315363886127, 'moderate': 0.5787255780477224}
+
     data_df = aHR_evaluation_table(model=model, groundtruth_dict=groundtruth, datapart='all')
     bar_plot_ahr_coverage(model=model, groundtruth_dict=groundtruth, datapart='all')
 
