@@ -988,6 +988,8 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth_dict, contrl_typ
     dirname = r'output/simulate_v3/{}/'.format(model)
     dfall = pd.read_excel(dirname + 'results/summarized_model_selection_{}.xlsx'.format(model),
                           sheet_name=contrl_type, converters={'drug': str})
+
+    # print only
     c1 = 'val_auc-i'
     c2 = 'val_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
@@ -1005,6 +1007,7 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth_dict, contrl_typ
     print(r"#df[{}] > 0: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
           '({:.2f}%)'.format(idx.mean() * 100))
 
+    # use all to compare
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'].notna()
     df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
 
@@ -1134,7 +1137,10 @@ def bar_plot_ahr_coverage(model, groundtruth_dict, contrl_type='all', dump=True,
     c2 = 'val_loss-i'
     c30 = 'trainval_n_unbalanced_feat_iptw-val_auc'
     c3 = 'trainval_n_unbalanced_feat_iptw-val_auc'  # val_loss
+
     # select drug trials with at least 10% balanced trials
+    # not used, just print here
+
     idx_auc = dfall['success_rate-' + c1 + '-all_n_unbalanced_feat_iptw'] >= 0.1
     idx_smd = dfall['success_rate-' + c2 + '-all_n_unbalanced_feat_iptw'] >= 0.1
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'] >= 0.1
@@ -1147,6 +1153,7 @@ def bar_plot_ahr_coverage(model, groundtruth_dict, contrl_type='all', dump=True,
     print(r"#df[{}] > 0.1: ".format('success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'), idx.sum(),
           '({:.2f}%)'.format(idx.mean() * 100))
 
+    # use all to compare
     idx = dfall['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'].notna()
     # df = dfall.loc[idx, :].sort_values(by=['success_rate-' + c30 + '-all_n_unbalanced_feat_iptw'], ascending=[False])
 
@@ -1304,51 +1311,6 @@ def bar_plot_ahr_coverage(model, groundtruth_dict, contrl_type='all', dump=True,
         else:
             return 'ns'
 
-    # # def labelvalue(rects, val, height=None):
-    # #     for i, rect in enumerate(rects):
-    # #         if height is None:
-    # #             h = rect.get_height() * 1.03
-    # #         else:
-    # #             h = height[i] * 1.03
-    # #         ax.text(rect.get_x() + rect.get_width() / 2., h,
-    # #                 significance(val[i]),
-    # #                 ha='center', va='bottom', fontsize=11)
-    # #
-    # # labelvalue(rects1, pauc, top_1_ci[:,1])
-    # # labelvalue(rects2, psmd, top_2_ci[:,1])
-    #
-    # for i, rect in enumerate(rects3):
-    #     d = 0.02
-    #     y = np.max([top_3_ci[i, 1], top_2_ci[i, 1], top_1_ci[i, 1]]) * 1.03  # rect.get_height()
-    #     w = rect.get_width()
-    #     x = rect.get_x()
-    #     x1 = x - 2 * w
-    #     x2 = x - 1 * w
-    #
-    #     y1 = top_1_ci[i, 1] * 1.03
-    #     y2 = top_2_ci[i, 1] * 1.03
-    #
-    #     # auc v.s. final
-    #     l, r = x1, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y + 2 * d, y + 3 * d, y + 3 * d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + 3 * d, y + 3 * d, y + 2 * d], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + 2.6 * d, significance(pauc[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # smd v.s. final
-    #     l, r = x2 + 0.6 * w, x + w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[1] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[2] if colorful else 'black')
-    #     # ax.plot([x2, x2, x, x], [y, y + d, y + d, y], c='#82A2D3') #c="black")
-    #     ax.text((l + r) / 2, y + 0.6 * d, significance(psmd[i]), ha='center', va='bottom', fontsize=13)
-    #
-    #     # auc v.s. smd
-    #     l, r = x1, x2 + 0.4 * w
-    #     ax.plot([l, l, (l + r) / 2], [y, y + d, y + d], lw=1.2, c=colors[0] if colorful else 'black')
-    #     ax.plot([(l + r) / 2, r, r], [y + d, y + d, y], lw=1.2, c=colors[1] if colorful else 'black')
-    #     # ax.plot([x1, x1, x, x], [y+2*d, y+3*d, y+3*d, y+2*d], c='#FAC200') #c="black")
-    #     ax.text((l + r) / 2, y + .6 * d, significance(paucsmd[i]), ha='center', va='bottom', fontsize=13)
-
     # ax.set_title('Success Rate of Balancing by Different PS Model Selection Methods')
     ax.legend((rects1[0], rects2[0], rects3[0]), ('Val-AUC Select', 'Val-Loss Select', 'Our Strategy'),
               fontsize=25, loc='center right')  # , bbox_to_anchor=(1.13, 1.01))
@@ -1503,34 +1465,34 @@ if __name__ == '__main__':
 
     # cohort_dir_name = 'save_cohort_all_loose'
     model = 'LR'  # 'LR'  # 'MLP'  # 'LR' #'LIGHTGBM'  #'LR'  #'LSTM'
-    results_model_selection_for_ml(model=model, niter=100) #100
-    results_model_selection_for_ml_step2(model=model)
+    # results_model_selection_for_ml(model=model, niter=100) #100
+    # results_model_selection_for_ml_step2(model=model)
     # # # results_model_selection_for_ml_step2More(cohort_dir_name=cohort_dir_name, model=model, drug_name=drug_name)
     #
     # # major plots from 3 methods
     # # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random')
     # # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
-    bar_plot_model_selection(model=model, contrl_type='all')
+    # bar_plot_model_selection(model=model, contrl_type='all')
     #
-    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
-    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
-    arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
+    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
+    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
+    # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
     #
     # # simulation sample number args.nsim:  1000000
     #
     ##groundtruth = 0.578  #4870728502016 # 0.5781950897226341
     groundtruth = {'no': 0.5780982066480141, 'moderate': 0.5780913629899157}
 
-    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
-    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
-    arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
-
-    data_df = arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
-    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
-    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
+    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
+    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
+    # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
+    #
+    # data_df = arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
+    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
+    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
     #
 
-    data_df = aHR_evaluation_table(model=model, groundtruth_dict=groundtruth, datapart='all')
+    # data_df = aHR_evaluation_table(model=model, groundtruth_dict=groundtruth, datapart='all')
     bar_plot_ahr_coverage(model=model, groundtruth_dict=groundtruth, datapart='all')
 
     print('Done')
