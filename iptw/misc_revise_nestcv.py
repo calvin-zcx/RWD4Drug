@@ -1371,6 +1371,22 @@ def bar_plot_model_selection(cohort_dir_name, model, contrl_type='random', dump=
 
     xlabels = df.loc[:, 'drug_name']
 
+    # add source data 2023-11-2
+    df_source_data = pd.DataFrame({'drug_name': xlabels,
+                                   'Success Rate by Validation AUC Select -Method 1': top_1,
+                                   'Success Rate by Validation Loss Select - Method 2': top_2,
+                                   'Success Rate by Our Selection Strategy': top_3,
+                                   r"P-value Welch's t-test between Method 1 and Our Strategy": df.loc[:,
+                                                                                                "p-succes-final-vs-1"],
+                                   r"P-value Welch's t-test between Method 2 and Our Strategy": df.loc[:,
+                                                                                                "p-succes-final-vs-2"],
+                                   r"P-value Welch's t-test between Method 1 and Method 2": df.loc[:, "p-succes-1-vs-2"]
+                                   })
+    check_and_mkdir(dirname + 'results/fig/')
+    df_source_data.to_csv(dirname + 'results/fig/balance_rate_barplot-{}-{}-SourceData.csv'.format(model, contrl_type))
+    # return df_source_data
+
+
     width = 0.45  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
 
@@ -1831,9 +1847,17 @@ def arrow_plot_model_selection_unbalance_reduction(cohort_dir_name, model, contr
             data[ith].append([drugname, before_mean, after_mean, change_mean])
 
     data_df = []
-    for d in data:
+    appendix = [c1, c2, c3]
+    # for d in data:
+    for igroup, d in enumerate(data):
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
+        check_and_mkdir(dirname + 'results/fig/')
+        df.to_csv(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}-{}.csv'.format(model, contrl_type, datapart,
+                                                                                     '-log' if log else '',
+                                                                                     appendix[igroup]))
+
+    # return data_df
 
     fig = plt.figure(figsize=(5, 8))
     # add start points
@@ -2600,8 +2624,8 @@ if __name__ == '__main__':
 
     # plot bar plot, for balance:
     bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all', consistent_drugs=True)
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random', consistent_drugs=True)
-    bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc', consistent_drugs=True)
+    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='random', consistent_drugs=True)
+    # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc', consistent_drugs=True)
 
     # plot arrow plot for balance
     arrow_plot_model_selection_unbalance_reduction(cohort_dir_name=cohort_dir_name, model=model, contrl_type='all',

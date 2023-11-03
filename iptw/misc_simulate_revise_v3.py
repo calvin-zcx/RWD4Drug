@@ -560,6 +560,23 @@ def bar_plot_model_selection(model, contrl_type='all', dump=True, colorful=True)
     xlabels = [x.replace('simun', '').replace('train0.8', '').replace('no', '-lin-').replace('moderate', '-nonLin-') for
                x in xlabels]
 
+
+    # add source data 2023-11-2
+    df_source_data = pd.DataFrame({'drug_name': xlabels,
+                                   'Success Rate by Validation AUC Select -Method 1': top_1,
+                                   'Success Rate by Validation Loss Select - Method 2': top_2,
+                                   'Success Rate by Our Selection Strategy': top_3,
+                                   r"P-value Welch's t-test between Method 1 and Our Strategy": df.loc[:,
+                                                                                                "p-succes-final-vs-1"],
+                                   r"P-value Welch's t-test between Method 2 and Our Strategy": df.loc[:,
+                                                                                                "p-succes-final-vs-2"],
+                                   r"P-value Welch's t-test between Method 1 and Method 2": df.loc[:, "p-succes-1-vs-2"]
+                                   })
+    check_and_mkdir(dirname + 'results/fig/')
+    df_source_data.to_csv(dirname + 'results/fig/balance_rate_barplot-{}-{}-SourceData.csv'.format(model, contrl_type))
+    # return df_source_data
+
+
     width = 0.45  # the width of the bars
     ind = np.arange(N) * width * 4  # the x locations for the groups
 
@@ -736,10 +753,23 @@ def arrow_plot_model_selection_unbalance_reduction(model, contrl_type='all', dum
                 'moderate', '-nonLin-'),  # drugname[5:],
                               before_mean, after_mean, change_mean])
 
+    # data_df = []
+    # for d in data:
+    #     df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
+    #     data_df.append(df)
+
+
     data_df = []
-    for d in data:
+    appendix = [c1, c2, c3]
+    # for d in data:
+    for igroup, d in enumerate(data):
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
+        check_and_mkdir(dirname + 'results/fig/')
+        df.to_csv(dirname + 'results/fig/arrow_nsmd_reduce-{}-{}-{}{}-{}.csv'.format(model, contrl_type, datapart,
+                                                                                     '-log' if log else '',
+                                                                                     appendix[igroup]))
+    # return data_df
 
     fig = plt.figure(figsize=(5, 6))
     # add start points
@@ -901,10 +931,18 @@ def arrow_plot_model_selection_bias_reduction(model, groundtruth_dict, contrl_ty
                 'moderate', '-nonLin-'),  # drugname[5:],
                               before_mean, after_mean, change_mean])
 
+
     data_df = []
-    for d in data:
+    appendix = [c1, c2, c3]
+    # for d in data:
+    for igroup, d in enumerate(data):
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
+        check_and_mkdir(dirname + 'results/fig/')
+        df.to_csv(dirname + 'results/fig/arrow_bias_reduce-{}-{}-{}{}-{}.csv'.format(model, contrl_type, datapart,
+                                                                                     '-log' if log else '',
+                                                                                     appendix[igroup]))
+    # return data_df
 
     fig = plt.figure(figsize=(5, 6))
     # add start points
@@ -1046,10 +1084,18 @@ def arrow_plot_model_selection_mse_reduction(model, groundtruth_dict, contrl_typ
                 'moderate', '-nonLin-'),  # drugname[5:],
                               mse_ori, mse_iptw, change])
 
+
     data_df = []
-    for d in data:
+    appendix = [c1, c2, c3]
+    # for d in data:
+    for igroup, d in enumerate(data):
         df = pd.DataFrame(d, columns=['subject', 'before', 'after', 'change'], index=range(len(d)))
         data_df.append(df)
+        check_and_mkdir(dirname + 'results/fig/')
+        df.to_csv(dirname + 'results/fig/arrow_MSE_reduce-{}-{}-{}{}-{}.csv'.format(model, contrl_type, datapart,
+                                                                                     '-log' if log else '',
+                                                                                     appendix[igroup]))
+    # return data_df
 
     fig = plt.figure(figsize=(5, 6))
     # add start points
@@ -1477,10 +1523,11 @@ if __name__ == '__main__':
     # # bar_plot_model_selection(cohort_dir_name=cohort_dir_name, model=model, contrl_type='atc')
     # bar_plot_model_selection(model=model, contrl_type='all')
     #
+
     # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='all')
     # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='train')
     # arrow_plot_model_selection_unbalance_reduction(model=model, datapart='test')
-    #
+
     # # simulation sample number args.nsim:  1000000
     #
     ##groundtruth = 0.578  #4870728502016 # 0.5781950897226341
@@ -1489,11 +1536,12 @@ if __name__ == '__main__':
     # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
     # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
     # arrow_plot_model_selection_bias_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
-    #
-    # data_df = arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
-    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
-    # arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
-    #
+
+
+    data_df = arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='all')
+    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='train')
+    arrow_plot_model_selection_mse_reduction(model=model, groundtruth_dict=groundtruth, datapart='test')
+
 
     # data_df = aHR_evaluation_table(model=model, groundtruth_dict=groundtruth, datapart='all')
     bar_plot_ahr_coverage(model=model, groundtruth_dict=groundtruth, datapart='all')

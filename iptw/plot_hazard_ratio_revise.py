@@ -131,6 +131,14 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
         npos.append(df.loc[drug_id_gpi, 'n_treat'])
         nneg.append(df.loc[drug_id_gpi, 'n_ctrl'])
 
+
+    # dump sourc data 2023-11-1
+    df_source = pd.DataFrame({'label': labs, 'aHR': measure, 'CI lower': lower, 'CI upper': upper,
+                              'n treat': npos, 'n control': nneg})
+    df_source.to_csv(output_dir + '{}_{}_forest-source-data.csv'.format(drug_id, drug_name))
+    # return df_source
+    ##
+
     p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper,
                           ncumIncidence=npos, nabs=nneg)
 
@@ -159,7 +167,7 @@ def plot_forest_for_drug(drug_id, drug_id_gpi, drug_name):
     plt.show()
     # plt.clf()
     plt.close()
-
+    return df_source
 
 def plot_forest_for_drug_selectcov(drug_id, drug_id_gpi, drug_name):
     output_dir = r'plots/hazard_ratio_revise_selectcov/'
@@ -271,6 +279,13 @@ def plot_forest_for_drug_f5yrs(drug_id, drug_id_gpi, drug_name):
         npos.append(df.loc[drug_id_gpi, 'n_treat'])
         nneg.append(df.loc[drug_id_gpi, 'n_ctrl'])
 
+    # dump sourc data 2023-11-1
+    df_source = pd.DataFrame({'label': labs, 'aHR': measure, 'CI lower': lower, 'CI upper':upper,
+                              'n treat': npos, 'n control': nneg})
+    df_source.to_csv(output_dir + '{}_{}_forest-source-data.csv'.format(drug_id, drug_name))
+    # return df_source
+    ##
+
     p = EffectMeasurePlot(label=labs, effect_measure=measure, lcl=lower, ucl=upper,
                           ncumIncidence=npos, nabs=nneg)
     p.labels(effectmeasure='aHR', add_label1='#Treated', add_label2='#Contrl')
@@ -298,6 +313,7 @@ def plot_forest_for_drug_f5yrs(drug_id, drug_id_gpi, drug_name):
     plt.show()
     # plt.clf()
     plt.close()
+    return df_source
 
 
 if __name__ == '__main__':
@@ -321,14 +337,15 @@ if __name__ == '__main__':
     # for idx in range(len(drug_id)):
     #     plot_forest_for_drug_selectcov(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
 
-    drug_label = ['prednisone', 'amoxicillin']
-    drug_id = ['8640', '723']
-    drug_id_gpi = ['22100045', '01200010']
+    # drug_label = ['prednisone', 'amoxicillin']
+    # drug_id = ['8640', '723']
+    # drug_id_gpi = ['22100045', '01200010']
 
-    # for idx in range(len(drug_id)):
-    #     plot_forest_for_drug(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
-
+    df_source_dict = {}
     for idx in range(len(drug_id)):
-        plot_forest_for_drug_f5yrs(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
+        # df_source = plot_forest_for_drug(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
+        df_source = plot_forest_for_drug_f5yrs(drug_id[idx], drug_id_gpi[idx], drug_label[idx])
+        df_source_dict[drug_label[idx]] = df_source
+
 
     print('Done')
